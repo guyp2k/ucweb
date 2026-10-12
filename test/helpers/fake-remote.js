@@ -24,10 +24,12 @@ export function mapping(entityId) {
   ];
 }
 
-export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false } = {}) {
+export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {} } = {}) {
   const state = {
     activities,
     buttonMappings,
+    entities,
+    entityRequests: 0,
     battery: { capacity: 80, status: 'DISCHARGING', power_supply: false },
     batteryError,
     powerMode: 'NORMAL',
@@ -61,6 +63,12 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
       if (!found) return send(res, 404, { message: 'no such activity' });
       state.activityDetailRequests += 1;
       return send(res, 200, { ...found, options: { button_mapping: state.buttonMappings[id] ?? [] } });
+    }
+    const entity = url.pathname.match(/^\/api\/entities\/([^/]+)$/);
+    if (entity && req.method === 'GET') {
+      state.entityRequests += 1;
+      const found = state.entities[decodeURIComponent(entity[1])];
+      return found ? send(res, 200, found) : send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
     }
     if (url.pathname === '/api/system/power/battery') {
       if (state.batteryError) return send(res, 400, { code: 'BAD_REQUEST', message: 'Invalid argument (os error 22)' });

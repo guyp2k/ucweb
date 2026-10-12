@@ -33,8 +33,31 @@ export function toBattery(data) {
   return { capacity: data.capacity, status: data.status ?? null, powerSupply: data.power_supply ?? null };
 }
 
+const FALLBACKS = {
+  BACK: { cmdId: 'media_player.back', features: ['home', 'menu', 'guide', 'info'] },
+  HOME: { cmdId: 'media_player.home', features: ['home'] },
+  MENU: { cmdId: 'media_player.menu', features: ['menu'] },
+  STOP: { cmdId: 'media_player.stop', features: ['stop'] },
+  RECORD: { cmdId: 'media_player.record', features: ['record'] },
+};
+
 function isMapped(entry) {
   return Boolean(entry.short_press?.entity_id && entry.short_press?.cmd_id);
+}
+
+export function resolveButtons(buttonMapping, dpadDevice) {
+  const features = new Set(dpadDevice?.entity_type === 'media_player' ? dpadDevice.features ?? [] : []);
+  return buttonMapping.map((entry) => {
+    if (isMapped(entry)) {
+      const { entity_id: entityId, cmd_id: cmdId, params } = entry.short_press;
+      return { button: entry.button, command: { entityId, cmdId, params }, fallback: false };
+    }
+    const fallback = FALLBACKS[entry.button];
+    if (fallback && fallback.features.some((feature) => features.has(feature))) {
+      return { button: entry.button, command: { entityId: dpadDevice.entity_id, cmdId: fallback.cmdId }, fallback: true };
+    }
+    return { button: entry.button, command: null, fallback: false };
+  });
 }
 
 export class Remote extends EventEmitter {
@@ -116,15 +139,15 @@ export class Remote extends EventEmitter {
 
   async buttons(activityId) {
     const mapping = await this.#mapping(activityId);
-    return mapping.map((entry) => ({ button: entry.button, mapped: isMapped(entry) }));
+    return mapping.map((entry) => ({ button: entry.button, mapped: entry.command !== null, fallback: entry.fallback }));
   }
 
   async press(activityId, button) {
     const activity = this.#requireActivity(activityId);
     const entry = (await this.#mapping(activityId)).find((candidate) => candidate.button === button);
     if (!entry) throw new HttpError(404, `${activity.name} has no ${button} button.`);
-    if (!isMapped(entry)) throw new HttpError(409, `${button} does nothing in ${activity.name}.`);
-    const { entity_id: entityId, cmd_id: cmdId, params } = entry.short_press;
+    if (!entry.command) throw new HttpError(409, `${button} does nothing in ${activity.name}.`);
+    const { entityId, cmdId, params } = entry.command;
     const body = params && Object.keys(params).length > 0 ? { cmd_id: cmdId, params } : { cmd_id: cmdId };
     await this.#request('PUT', `/api/entities/${encodeURIComponent(entityId)}/command`, body);
   }
@@ -143,9 +166,23 @@ export class Remote extends EventEmitter {
     this.#requireActivity(activityId);
     if (!this.#mappings.has(activityId)) {
       const { data } = await this.#request('GET', `/api/activities/${encodeURIComponent(activityId)}`);
-      this.#mappings.set(activityId, data?.options?.button_mapping ?? []);
+      const buttonMapping = data?.options?.button_mapping ?? [];
+      const dpadEntityId = buttonMapping.find((entry) => entry.button.startsWith('DPAD_') && isMapped(entry))?.short_press.entity_id;
+      const needsDevice = buttonMapping.some((entry) => !isMapped(entry) && FALLBACKS[entry.button]);
+      const dpadDevice = dpadEntityId && needsDevice ? await this.#entity(dpadEntityId) : null;
+      this.#mappings.set(activityId, resolveButtons(buttonMapping, dpadDevice));
     }
     return this.#mappings.get(activityId);
+  }
+
+  async #entity(entityId) {
+    try {
+      return (await this.#request('GET', `/api/entities/${encodeURIComponent(entityId)}`)).data;
+    } catch (error) {
+      if (error.status !== 502) throw error;
+      this.emit('warning', error.message);
+      return null;
+    }
   }
 
   #emitChange() {

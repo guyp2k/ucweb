@@ -163,10 +163,82 @@ test('the button list reports which buttons are mapped', async () => {
   await connect({ buttonMappings: { 'act.tv': mapping('media.tv') } });
   await waitFor(() => remote.snapshot().online, { message: 'online' });
   assert.deepEqual(await remote.buttons('act.tv'), [
-    { button: 'DPAD_UP', mapped: true },
-    { button: 'VOLUME_UP', mapped: true },
-    { button: 'BACK', mapped: false },
+    { button: 'DPAD_UP', mapped: true, fallback: false },
+    { button: 'VOLUME_UP', mapped: true, fallback: false },
+    { button: 'BACK', mapped: false, fallback: false },
   ]);
+});
+
+const player = (features) => ({ entity_id: 'media.tv', entity_type: 'media_player', features });
+const dpadOnly = [
+  { button: 'DPAD_UP', short_press: { entity_id: 'media.tv', cmd_id: 'media_player.cursor_up' } },
+  { button: 'BACK' },
+  { button: 'HOME' },
+  { button: 'MENU' },
+  { button: 'STOP' },
+  { button: 'RECORD' },
+];
+
+test('unmapped buttons go to the device the D-pad drives when it reports the feature', async () => {
+  await connect({ buttonMappings: { 'act.tv': dpadOnly }, entities: { 'media.tv': player(['dpad', 'home', 'menu', 'stop', 'record']) } });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  assert.deepEqual(await remote.buttons('act.tv'), [
+    { button: 'DPAD_UP', mapped: true, fallback: false },
+    { button: 'BACK', mapped: true, fallback: true },
+    { button: 'HOME', mapped: true, fallback: true },
+    { button: 'MENU', mapped: true, fallback: true },
+    { button: 'STOP', mapped: true, fallback: true },
+    { button: 'RECORD', mapped: true, fallback: true },
+  ]);
+  for (const button of ['BACK', 'HOME', 'MENU', 'STOP', 'RECORD']) await remote.press('act.tv', button);
+  assert.deepEqual(fake.state.commands.map((command) => [command.entityId, command.body.cmd_id]), [
+    ['media.tv', 'media_player.back'],
+    ['media.tv', 'media_player.home'],
+    ['media.tv', 'media_player.menu'],
+    ['media.tv', 'media_player.stop'],
+    ['media.tv', 'media_player.record'],
+  ]);
+});
+
+test('a fallback needs the device to report the matching feature', async () => {
+  await connect({ buttonMappings: { 'act.tv': dpadOnly }, entities: { 'media.tv': player(['dpad', 'stop']) } });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  const mapped = Object.fromEntries((await remote.buttons('act.tv')).map((entry) => [entry.button, entry.mapped]));
+  assert.deepEqual(mapped, { DPAD_UP: true, BACK: false, HOME: false, MENU: false, STOP: true, RECORD: false });
+  await assert.rejects(remote.press('act.tv', 'HOME'), { status: 409 });
+});
+
+test('back falls back when the device reports any menu it can leave', async () => {
+  for (const feature of ['home', 'menu', 'guide', 'info']) {
+    await connect({ buttonMappings: { 'act.tv': dpadOnly }, entities: { 'media.tv': player(['dpad', feature]) } });
+    await waitFor(() => remote.snapshot().online, { message: 'online' });
+    const back = (await remote.buttons('act.tv')).find((entry) => entry.button === 'BACK');
+    assert.equal(back.mapped, true, feature);
+    remote.stop();
+    await fake.close();
+  }
+  fake = null;
+});
+
+test('no fallback when the D-pad drives something other than a media player', async () => {
+  await connect({ buttonMappings: { 'act.tv': dpadOnly }, entities: { 'media.tv': { entity_id: 'media.tv', entity_type: 'remote', features: ['send', 'home', 'menu'] } } });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  assert.equal((await remote.buttons('act.tv')).filter((entry) => entry.mapped).length, 1);
+});
+
+test('no fallback when the D-pad device is missing on the remote', async () => {
+  await connect({ buttonMappings: { 'act.tv': dpadOnly }, entities: {} });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  assert.equal((await remote.buttons('act.tv')).filter((entry) => entry.mapped).length, 1);
+});
+
+test('a button the activity maps is never replaced by a fallback', async () => {
+  const mapping = [...dpadOnly.filter((entry) => entry.button !== 'HOME'), { button: 'HOME', short_press: { entity_id: 'media.amp', cmd_id: 'media_player.home' } }];
+  await connect({ buttonMappings: { 'act.tv': mapping }, entities: { 'media.tv': player(['dpad', 'home']) } });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  await remote.press('act.tv', 'HOME');
+  assert.deepEqual(fake.state.commands, [{ entityId: 'media.amp', body: { cmd_id: 'media_player.home' } }]);
+  assert.equal((await remote.buttons('act.tv')).find((entry) => entry.button === 'HOME').fallback, false);
 });
 
 test('editing an activity refreshes its button mapping', async () => {

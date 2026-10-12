@@ -377,10 +377,11 @@ function renderActivities(remote) {
 
 function applyButtons() {
   for (const key of document.querySelectorAll('#pad [data-button]')) {
-    const mapped = state.buttons?.get(key.dataset.button);
-    key.hidden = state.buttons !== null && mapped === undefined;
-    key.disabled = mapped !== true;
-    key.title = mapped === false ? 'Not set up for this activity' : '';
+    const button = state.buttons?.get(key.dataset.button);
+    key.hidden = state.buttons !== null && button === undefined;
+    key.disabled = button?.mapped !== true;
+    if (button?.fallback) key.title = 'Not set in this activity: sent to the device the D-pad controls';
+    else key.title = button?.mapped === false ? 'Not set up for this activity' : '';
   }
 }
 
@@ -393,7 +394,7 @@ async function loadButtons(remote, activity) {
   try {
     const buttons = await api(`/api/remotes/${encodeURIComponent(remote.id)}/activities/${encodeURIComponent(activity.id)}/buttons`);
     if (state.buttonsKey !== key) return;
-    state.buttons = new Map(buttons.map((button) => [button.button, button.mapped]));
+    state.buttons = new Map(buttons.map((button) => [button.button, button]));
   } catch (error) {
     if (state.buttonsKey !== key) return;
     state.buttonsKey = null;
