@@ -207,9 +207,10 @@ test('the theme list is discovered from the themes folder', async () => {
   const config = await (await fetch(`${base}/api/config`)).json();
   assert.equal(config.defaultTheme, 'miyara');
   assert.deepEqual(config.themes.map((theme) => theme.id).sort(), [
-    'brookwood', 'brookwood-light', 'copper', 'dark-orange', 'graphite-brass', 'miyara', 'original', 'roon', 'roon-light',
+    'brookwood', 'brookwood-light', 'copper', 'dark-orange', 'graphite-brass', 'miyara', 'original', 'pats-blue', 'roon', 'roon-light',
   ]);
   assert.equal(config.themes.find((theme) => theme.id === 'copper').name, 'Obsidian & Copper');
+  assert.equal(config.themes.find((theme) => theme.id === 'pats-blue').name, "Pat's Blue");
 });
 
 test('the build version changes when any page file changes', async () => {

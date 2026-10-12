@@ -1,0 +1,23 @@
+:root {
+  color-scheme: dark;
+  --bg: #101a2d;
+  --surface: #172943;
+  --surface-raised: #1d314f;
+  --border: #47668d;
+  --text: #edf2f8;
+  --muted: #b3c0d5;
+  --accent: #8db9ff;
+  --accent-fill: #3d75c4;
+  --accent-fill-hover: #2f63ad;
+  --on-accent: #ffffff;
+  --glow: rgba(141, 185, 255, 0.4);
+  --ok: #85d4b1;
+  --warn: #f4ca83;
+  --font-body: ui-rounded, "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  --font-display: ui-rounded, "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  --font-label: ui-rounded, "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  --display-weight: 700;
+  --label-case: uppercase;
+  --label-tracking: 0.12em;
+  --radius: 10px;
+}
