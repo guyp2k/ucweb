@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -27,6 +28,23 @@ const SECURITY_HEADERS = {
 };
 
 const MAX_BODY_BYTES = 4096;
+
+export async function assetVersion(publicDir) {
+  const hash = createHash('sha256');
+  const walk = async (dir) => {
+    const entries = (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+      } else {
+        hash.update(path.relative(publicDir, full)).update('\0').update(await readFile(full)).update('\0');
+      }
+    }
+  };
+  await walk(publicDir);
+  return hash.digest('hex').slice(0, 16);
+}
 
 export async function discoverThemes(publicDir) {
   const themesDir = path.join(publicDir, 'themes');
@@ -106,7 +124,7 @@ async function serveStatic(publicDir, pathname, res) {
   return true;
 }
 
-export function createServer({ remotes, publicDir, themes, defaultTheme, auth }) {
+export function createServer({ remotes, publicDir, themes, defaultTheme, auth, version }) {
   const root = path.resolve(publicDir);
   const byId = new Map(remotes.map((remote) => [remote.id, remote]));
 
@@ -235,7 +253,7 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth })
     client.on('pong', () => {
       client.isAlive = true;
     });
-    client.send(JSON.stringify({ type: 'snapshot', remotes: remotes.map((remote) => remote.snapshot()) }));
+    client.send(JSON.stringify({ type: 'snapshot', version, remotes: remotes.map((remote) => remote.snapshot()) }));
   });
   server.on('close', () => {
     clearInterval(heartbeat);

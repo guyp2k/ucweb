@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { Auth } from './auth.js';
 import { loadConfig } from './config.js';
 import { Remote } from './remote.js';
-import { createServer, discoverThemes } from './server.js';
+import { assetVersion, createServer, discoverThemes } from './server.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
@@ -39,7 +39,7 @@ for (const remote of remotes) {
   remote.start();
 }
 
-const server = createServer({ remotes, publicDir, themes, defaultTheme: config.defaultTheme, auth });
+const server = createServer({ remotes, publicDir, themes, defaultTheme: config.defaultTheme, auth, version: await assetVersion(publicDir) });
 server.listen(config.port, () => console.log(`ucweb listening on port ${config.port}.`));
 
 const shutdown = () => {

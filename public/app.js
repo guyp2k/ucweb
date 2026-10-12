@@ -31,6 +31,7 @@ const KEYMAP = {
 
 const state = {
   themes: [],
+  version: null,
   remotes: new Map(),
   order: [],
   remoteId: null,
@@ -217,6 +218,11 @@ function connect() {
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
     if (message.type === 'snapshot') {
+      if (state.version && message.version !== state.version) {
+        location.reload();
+        return;
+      }
+      state.version = message.version;
       state.remotes = new Map(message.remotes.map((remote) => [remote.id, remote]));
       state.order = message.remotes.map((remote) => remote.id);
       const saved = load(STORAGE.remote);
