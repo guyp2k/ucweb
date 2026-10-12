@@ -5,6 +5,7 @@ import WebSocket from 'ws';
 
 const PAGE_SIZE = 100;
 const CHANNELS = ['entity_activity', 'battery_status'];
+const SYSTEM_COMMANDS = new Set(['REBOOT', 'POWER_OFF']);
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -137,6 +138,11 @@ export class Remote extends EventEmitter {
     await this.#request('PUT', `/api/entities/${encodeURIComponent(activityId)}/command`, {
       cmd_id: on ? 'activity.on' : 'activity.off',
     });
+  }
+
+  async systemCommand(cmd) {
+    if (!SYSTEM_COMMANDS.has(cmd)) throw new HttpError(400, `Send one of ${[...SYSTEM_COMMANDS].join(', ')}.`);
+    await this.#request('POST', `/api/system?cmd=${cmd}`);
   }
 
   async buttons(activityId) {

@@ -1019,6 +1019,113 @@ svg {
   transform: translateX(-50%);
 }
 
+.system {
+  margin-top: 28px;
+}
+
+.system-panel {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface-glass);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.system-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+.system-row + .system-row {
+  border-top: 1px solid var(--hairline);
+}
+
+.system-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.system-row.is-danger .system-icon {
+  stroke: var(--warn);
+}
+
+.system-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.system-name {
+  margin: 0 0 2px;
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.system-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.system-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 132px;
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.system-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.system-button:hover:not(:disabled) {
+  border-color: var(--accent-fill);
+}
+
+.system-row.is-danger .system-button {
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  background: color-mix(in srgb, var(--warn) 8%, var(--surface));
+  color: var(--warn);
+}
+
+.system-row.is-danger .system-button:hover:not(:disabled) {
+  border-color: var(--warn);
+}
+
+.system-button.is-armed,
+.system-row.is-danger .system-button.is-armed {
+  border-color: var(--warn);
+  background: var(--warn);
+  color: var(--bg);
+}
+
+.system-button:disabled {
+  opacity: 0.5;
+}
+
 @media (max-width: 900px) {
   .status {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1084,5 +1191,18 @@ svg {
 
   .activity-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .system-row {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+
+  .system-text {
+    flex-basis: calc(100% - 38px);
+  }
+
+  .system-button {
+    width: 100%;
   }
 }

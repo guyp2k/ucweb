@@ -35,6 +35,7 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
     powerSupply: false,
     powerMode: 'NORMAL',
     commands: [],
+    systemCommands: [],
     activityDetailRequests: 0,
     pageRequests: [],
   };
@@ -76,6 +77,15 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
       return send(res, 200, state.battery);
     }
     if (url.pathname === '/api/system/power') return send(res, 200, { mode: state.powerMode, power_supply: state.powerSupply });
+    if (url.pathname === '/api/system' && req.method === 'POST') {
+      if (req.headers['content-length'] === undefined) return send(res, 411);
+      const cmd = url.searchParams.get('cmd');
+      if (!['STANDBY', 'REBOOT', 'POWER_OFF', 'RESTART', 'RESTART_UI', 'RESTART_CORE'].includes(cmd)) {
+        return send(res, 400, { code: 'BAD_REQUEST', message: `unknown variant \`${cmd}\`` });
+      }
+      state.systemCommands.push(cmd);
+      return send(res, 200, { code: 200, message: 'OK' });
+    }
     const command = url.pathname.match(/^\/api\/entities\/([^/]+)\/command$/);
     if (command && req.method === 'PUT') {
       let body = '';

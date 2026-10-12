@@ -163,6 +163,14 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
     if (parts.length === 1 && parts[0] === 'remotes' && method === 'GET') {
       return sendJson(res, 200, remotes.map((remote) => remote.snapshot()));
     }
+    if (parts.length === 3 && parts[0] === 'remotes' && parts[2] === 'system') {
+      const remote = findRemote(parts[1]);
+      if (method !== 'POST') throw new HttpError(405, `${method} is not allowed here.`);
+      if (!sameOrigin(req)) throw new HttpError(403, 'Cross-site requests are not allowed.');
+      const { command } = await readJsonBody(req);
+      await remote.systemCommand(command);
+      return sendJson(res, 200, { ok: true });
+    }
     if (parts[0] === 'remotes' && parts[2] === 'activities' && parts.length >= 5) {
       const remote = findRemote(parts[1]);
       const activityId = parts[3];
