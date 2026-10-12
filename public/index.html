@@ -80,86 +80,94 @@
     <section class="status" id="status" aria-live="polite"></section>
 
     <div class="layout">
-      <section class="panel activities" aria-labelledby="activities-title">
-        <h2 class="eyebrow" id="activities-title">Activities</h2>
+      <section class="section activities" aria-labelledby="activities-title">
+        <header class="section-head">
+          <h2 class="section-title" id="activities-title">Activities</h2>
+          <span class="section-meta" id="activities-meta"></span>
+        </header>
         <div class="activity-grid" id="activity-grid"></div>
       </section>
 
-      <section class="panel control" id="control" aria-labelledby="control-title">
-        <h2 class="eyebrow" id="control-title">Control</h2>
-        <div class="control-head" id="control-head"></div>
+      <section class="section control" id="control" aria-labelledby="control-title">
+        <header class="section-head">
+          <h2 class="section-title" id="control-title">Control</h2>
+          <span class="section-meta" id="control-meta"></span>
+        </header>
+        <div class="control-panel">
+          <div class="control-head" id="control-head"></div>
 
-        <div class="pad" id="pad" hidden>
-          <div class="pad-row pad-top">
-            <button class="key" data-button="BACK" aria-label="Back">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
-            </button>
-            <button class="key" data-button="HOME" aria-label="Home">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>
-            </button>
-            <button class="key" data-button="MENU" aria-label="Menu">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
-            </button>
-          </div>
-
-          <div class="dpad">
-            <button class="dpad-key dpad-up" data-button="DPAD_UP" data-repeat aria-label="Up">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
-            </button>
-            <button class="dpad-key dpad-left" data-button="DPAD_LEFT" data-repeat aria-label="Left">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-            </button>
-            <button class="dpad-ok" data-button="DPAD_MIDDLE" aria-label="OK">OK</button>
-            <button class="dpad-key dpad-right" data-button="DPAD_RIGHT" data-repeat aria-label="Right">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-            </button>
-            <button class="dpad-key dpad-down" data-button="DPAD_DOWN" data-repeat aria-label="Down">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-            </button>
-          </div>
-
-          <div class="pad-row rockers">
-            <div class="rocker" role="group" aria-label="Volume">
-              <button class="key" data-button="VOLUME_UP" data-repeat aria-label="Volume up">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
+          <div class="pad" id="pad" hidden>
+            <div class="pad-row pad-top">
+              <button class="key" data-button="BACK" aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
               </button>
-              <span class="rocker-label">Vol</span>
-              <button class="key" data-button="VOLUME_DOWN" data-repeat aria-label="Volume down">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>
+              <button class="key" data-button="HOME" aria-label="Home">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>
+              </button>
+              <button class="key" data-button="MENU" aria-label="Menu">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
               </button>
             </div>
-            <button class="key key-round" data-button="MUTE" aria-label="Mute">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg>
-            </button>
-            <div class="rocker" role="group" aria-label="Channel">
-              <button class="key" data-button="CHANNEL_UP" data-repeat aria-label="Channel up">
+
+            <div class="dpad">
+              <button class="dpad-key dpad-up" data-button="DPAD_UP" data-repeat aria-label="Up">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
               </button>
-              <span class="rocker-label">Ch</span>
-              <button class="key" data-button="CHANNEL_DOWN" data-repeat aria-label="Channel down">
+              <button class="dpad-key dpad-left" data-button="DPAD_LEFT" data-repeat aria-label="Left">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+              </button>
+              <button class="dpad-ok" data-button="DPAD_MIDDLE" aria-label="OK">OK</button>
+              <button class="dpad-key dpad-right" data-button="DPAD_RIGHT" data-repeat aria-label="Right">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+              <button class="dpad-key dpad-down" data-button="DPAD_DOWN" data-repeat aria-label="Down">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
               </button>
             </div>
-          </div>
 
-          <div class="pad-row transport">
-            <button class="key" data-button="PREV" aria-label="Previous">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>
-            </button>
-            <button class="key" data-button="STOP" aria-label="Stop">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>
-            </button>
-            <button class="key key-primary" data-button="PLAY" aria-label="Play or pause">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l9-7zM16 6v12M20 6v12"/></svg>
-            </button>
-            <button class="key" data-button="RECORD" aria-label="Record">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg>
-            </button>
-            <button class="key" data-button="NEXT" aria-label="Next">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>
-            </button>
+            <div class="pad-row rockers">
+              <div class="rocker" role="group" aria-label="Volume">
+                <button class="key" data-button="VOLUME_UP" data-repeat aria-label="Volume up">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
+                </button>
+                <span class="rocker-label">Vol</span>
+                <button class="key" data-button="VOLUME_DOWN" data-repeat aria-label="Volume down">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>
+                </button>
+              </div>
+              <button class="key key-round" data-button="MUTE" aria-label="Mute">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg>
+              </button>
+              <div class="rocker" role="group" aria-label="Channel">
+                <button class="key" data-button="CHANNEL_UP" data-repeat aria-label="Channel up">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+                </button>
+                <span class="rocker-label">Ch</span>
+                <button class="key" data-button="CHANNEL_DOWN" data-repeat aria-label="Channel down">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="pad-row transport">
+              <button class="key" data-button="PREV" aria-label="Previous">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>
+              </button>
+              <button class="key" data-button="STOP" aria-label="Stop">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>
+              </button>
+              <button class="key key-primary" data-button="PLAY" aria-label="Play or pause">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l9-7zM16 6v12M20 6v12"/></svg>
+              </button>
+              <button class="key" data-button="RECORD" aria-label="Record">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg>
+              </button>
+              <button class="key" data-button="NEXT" aria-label="Next">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>
+              </button>
+            </div>
+            <p class="hint">Keyboard: arrows, Enter, Backspace, + and -, M, Space.</p>
           </div>
-          <p class="hint">Keyboard: arrows, Enter, Backspace, + and -, M, Space.</p>
         </div>
       </section>
     </div>

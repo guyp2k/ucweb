@@ -276,8 +276,9 @@ function renderTabs() {
     const dot = el('span', `dot ${remote.online ? 'is-online' : 'is-offline'}`);
     dot.setAttribute('aria-hidden', 'true');
     tab.append(dot, el('span', 'remote-tab-name', remote.name ?? remote.address));
-    if (remote.battery) tab.append(el('span', 'remote-tab-battery', `${remote.battery.capacity}%`));
-    tab.title = remote.online ? `${remote.name} is online` : `${remote.name ?? remote.address} is offline`;
+    tab.append(el('span', 'remote-tab-battery', remote.battery ? `${remote.battery.capacity}%` : 'n/a'));
+    const batteryNote = remote.battery ? '' : ', battery level not available right now';
+    tab.title = `${remote.name ?? remote.address} is ${remote.online ? 'online' : 'offline'}${batteryNote}`;
     tab.addEventListener('click', () => selectRemote(id));
     return tab;
   });
@@ -428,8 +429,15 @@ function renderControl(remote) {
   loadButtons(remote, activity);
 }
 
+function renderSectionMeta(remote) {
+  const count = remote?.activities.length ?? 0;
+  $('activities-meta').textContent = remote ? `${count} ${count === 1 ? 'activity' : 'activities'}` : '';
+  $('control-meta').textContent = remote ? remote.name ?? remote.address : '';
+}
+
 function render() {
   const remote = currentRemote();
+  renderSectionMeta(remote);
   renderTabs();
   renderStatus(remote);
   renderActivities(remote);
