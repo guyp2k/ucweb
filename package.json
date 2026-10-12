@@ -12,6 +12,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test test/*.test.js",
+    "test:sim": "node --test --test-concurrency=1 test/sim/*.test.js",
     "lint": "eslint .",
     "set-pin": "node src/set-pin.js"
   },
