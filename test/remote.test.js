@@ -175,6 +175,23 @@ test('start and stop send activity.on and activity.off to the activity', async (
   await assert.rejects(remote.setActivityPower('act.missing', true), { status: 404 });
 });
 
+test('reboot and power off are sent to the remote as system commands', async () => {
+  await connect();
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  await remote.systemCommand('REBOOT');
+  await remote.systemCommand('POWER_OFF');
+  assert.deepEqual(fake.state.systemCommands, ['REBOOT', 'POWER_OFF']);
+});
+
+test('only reboot and power off are allowed as system commands', async () => {
+  await connect();
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  for (const cmd of ['RESTART', 'STANDBY', 'reboot', undefined]) {
+    await assert.rejects(remote.systemCommand(cmd), (error) => error.status === 400, String(cmd));
+  }
+  assert.deepEqual(fake.state.systemCommands, []);
+});
+
 test('a mapped button sends its command to the mapped entity', async () => {
   await connect({ buttonMappings: { 'act.tv': mapping('media.tv') } });
   await waitFor(() => remote.snapshot().online, { message: 'online' });

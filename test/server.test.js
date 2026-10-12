@@ -151,6 +151,26 @@ test('commands from another site are refused', async () => {
   assert.equal(fake.state.commands.length, 0);
 });
 
+test('a signed-in browser can reboot or power off a remote', async () => {
+  fake.state.systemCommands.length = 0;
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/system`;
+  assert.equal((await authed(route, { method: 'POST', body: '{"command":"REBOOT"}' })).status, 200);
+  assert.equal((await authed(route, { method: 'POST', body: '{"command":"POWER_OFF"}' })).status, 200);
+  assert.deepEqual(fake.state.systemCommands, ['REBOOT', 'POWER_OFF']);
+});
+
+test('system commands are refused without a session, from another site, or when not reboot or power off', async () => {
+  fake.state.systemCommands.length = 0;
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/system`;
+  const anonymous = await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"command":"REBOOT"}' });
+  assert.equal(anonymous.status, 401);
+  assert.equal((await authed(route, { method: 'POST', body: '{"command":"REBOOT"}', headers: { origin: 'http://evil.example' } })).status, 403);
+  assert.equal((await authed(route, { method: 'POST', body: '{"command":"RESTART"}' })).status, 400);
+  assert.equal((await authed(route, { method: 'GET' })).status, 405);
+  assert.equal((await authed('/api/remotes/nope/system', { method: 'POST', body: '{"command":"REBOOT"}' })).status, 404);
+  assert.deepEqual(fake.state.systemCommands, []);
+});
+
 test('commands must be sent as JSON', async () => {
   const response = await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/power`, {
     method: 'POST',

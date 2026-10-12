@@ -42,6 +42,9 @@ const state = {
   socketAttempts: 0,
   reconnectTimer: null,
   inflight: new Set(),
+  systemArmed: null,
+  systemTimer: null,
+  systemBusy: false,
 };
 
 function load(key) {
@@ -439,6 +442,61 @@ function renderSectionMeta(remote) {
   const count = remote?.activities.length ?? 0;
   $('activities-meta').textContent = remote ? `${count} ${count === 1 ? 'activity' : 'activities'}` : '';
   $('control-meta').textContent = remote ? remote.name ?? remote.address : '';
+  $('system-meta').textContent = remote ? `Sent directly to ${remote.name ?? remote.address}` : '';
+}
+
+const SYSTEM_ACTIONS = {
+  REBOOT: { label: 'Reboot', confirm: 'Tap to confirm', done: 'is rebooting.' },
+  POWER_OFF: { label: 'Power off', confirm: 'Tap to confirm', done: 'is powering off. Turn it back on at the remote.' },
+};
+const CONFIRM_MS = 4000;
+
+function disarmSystem() {
+  clearTimeout(state.systemTimer);
+  state.systemArmed = null;
+  for (const button of document.querySelectorAll('.system-button')) {
+    button.classList.remove('is-armed');
+    button.querySelector('.system-button-text').textContent = SYSTEM_ACTIONS[button.dataset.command].label;
+  }
+}
+
+function renderSystem(remote) {
+  if (state.systemArmed && state.systemArmed.remoteId !== remote?.id) disarmSystem();
+  for (const button of document.querySelectorAll('.system-button')) {
+    button.disabled = !remote?.online || state.systemBusy;
+  }
+}
+
+async function systemCommand(button) {
+  const remote = currentRemote();
+  if (!remote?.online || state.systemBusy) return;
+  const command = button.dataset.command;
+  if (state.systemArmed?.command !== command || state.systemArmed.remoteId !== remote.id) {
+    disarmSystem();
+    state.systemArmed = { command, remoteId: remote.id };
+    button.classList.add('is-armed');
+    button.querySelector('.system-button-text').textContent = SYSTEM_ACTIONS[command].confirm;
+    state.systemTimer = setTimeout(disarmSystem, CONFIRM_MS);
+    return;
+  }
+  disarmSystem();
+  state.systemBusy = true;
+  renderSystem(remote);
+  try {
+    await api(`/api/remotes/${encodeURIComponent(remote.id)}/system`, { method: 'POST', body: JSON.stringify({ command }) });
+    toast(`${remote.name ?? remote.address} ${SYSTEM_ACTIONS[command].done}`);
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    state.systemBusy = false;
+    renderSystem(currentRemote());
+  }
+}
+
+function initSystem() {
+  for (const button of document.querySelectorAll('.system-button')) {
+    button.addEventListener('click', () => systemCommand(button));
+  }
 }
 
 function render() {
@@ -448,6 +506,7 @@ function render() {
   renderStatus(remote);
   renderActivities(remote);
   renderControl(remote);
+  renderSystem(remote);
 }
 
 async function press(button) {
@@ -516,6 +575,7 @@ function initPad() {
 async function boot() {
   initLogin();
   initPad();
+  initSystem();
   try {
     await initThemes();
     const session = await api('/api/session');
