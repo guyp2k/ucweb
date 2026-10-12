@@ -110,6 +110,22 @@ UC_REMOTES=192.168.1.20 UCWEB_CONFIG_DIR=./dev npm start
 
 Node 20 or later. The browser code is plain ES modules with no build step.
 
+### Against the Unfolded Circle core simulator
+
+`npm run test:sim` runs ucweb against the real Core API in
+[unfoldedcircle/core-simulator](https://github.com/unfoldedcircle/core-simulator): it creates an API key and two
+activities, then starts, presses, renames and deletes through ucweb and checks the live events. CI runs it on every
+push before the image is built.
+
+```sh
+docker run -d --name core-simulator -p 8080:8080 unfoldedcircle/core-simulator:0.81.2-bt
+UC_SIM=127.0.0.1:8080 npm run test:sim
+```
+
+The last test sends REBOOT, which stops the simulator; start it again for the next run. `UC_SIM_USER` and
+`UC_SIM_PASSWORD` default to the simulator's `web-configurator` / `1234`. The simulator is licensed for development
+use only and is never part of the ucweb image.
+
 ## Credits
 
 - The Remote's API is documented in [unfoldedcircle/core-api](https://github.com/unfoldedcircle/core-api).

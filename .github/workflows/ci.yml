@@ -28,8 +28,26 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  simulator:
+    runs-on: ubuntu-latest
+    services:
+      core-simulator:
+        image: unfoldedcircle/core-simulator:0.81.2-bt
+        ports:
+          - 8080:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:sim
+        env:
+          UC_SIM: 127.0.0.1:8080
+
   image:
-    needs: test
+    needs: [test, simulator]
     runs-on: ubuntu-latest
     permissions:
       contents: read
