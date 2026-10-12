@@ -81,6 +81,18 @@ test('a battery reading that arrives later clears the battery problem', async ()
   assert.equal(remote.snapshot().powerSupply, true);
 });
 
+test('an unreadable battery is read again on the power check until it answers', async () => {
+  fake = await startFakeRemote({ batteryError: true });
+  await writeFile(path.join(keysDir, `${HOSTNAME}.key`), KEY);
+  remote = new Remote({ address: fake.address, keysDir, reconnectDelays: [20], powerPollMs: 40 });
+  remote.start();
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  assert.equal(remote.snapshot().battery, null);
+  fake.state.batteryError = false;
+  await waitFor(() => remote.snapshot().battery?.capacity === 80, { message: 'battery recovered' });
+  assert.equal(remote.snapshot().batteryProblem, null);
+});
+
 test('every activity is loaded across pages of 100', async () => {
   const many = Array.from({ length: 150 }, (_, i) => activity(`act.${String(i).padStart(3, '0')}`, `Activity ${String(i).padStart(3, '0')}`));
   await connect({ activities: many });
