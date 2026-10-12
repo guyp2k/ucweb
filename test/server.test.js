@@ -7,7 +7,7 @@ import { after, before, test } from 'node:test';
 import WebSocket from 'ws';
 import { Auth, hashPin } from '../src/auth.js';
 import { Remote } from '../src/remote.js';
-import { createServer, discoverThemes } from '../src/server.js';
+import { assetVersion, createServer, discoverThemes } from '../src/server.js';
 import { HOSTNAME, KEY, mapping, startFakeRemote, waitFor } from './helpers/fake-remote.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
@@ -30,7 +30,7 @@ before(async () => {
   await waitFor(() => remote.snapshot().online, { message: 'online' });
   const auth = new Auth({ configDir: dir });
   await auth.init();
-  server = createServer({ remotes: [remote], publicDir, themes: await discoverThemes(publicDir), defaultTheme: 'miyara', auth });
+  server = createServer({ remotes: [remote], publicDir, themes: await discoverThemes(publicDir), defaultTheme: 'miyara', auth, version: await assetVersion(publicDir) });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   base = `http://127.0.0.1:${server.address().port}`;
   const login = await fetch(`${base}/api/session`, {
@@ -102,10 +102,12 @@ test('the live event stream refuses a browser without a session', async () => {
   await assert.rejects(openEvents({ origin: base }), /HTTP 401/);
 });
 
-test('the live event stream sends a snapshot and then every change', async () => {
+test('the live event stream sends a snapshot and then every change', async (t) => {
   const { socket, messages } = await openEvents({ cookie, origin: base });
+  t.after(() => socket.terminate());
   await waitFor(() => messages.length >= 1, { message: 'snapshot' });
   assert.equal(messages[0].type, 'snapshot');
+  assert.equal(messages[0].version, await assetVersion(publicDir));
   assert.equal(messages[0].remotes[0].name, 'Test Den');
   fake.emit('battery_status', { capacity: 12, status: 'DISCHARGING', power_supply: false });
   await waitFor(() => messages.some((message) => message.type === 'remote' && message.remote.battery?.capacity === 12), { message: 'battery update' });
@@ -188,6 +190,17 @@ test('the theme list is discovered from the themes folder', async () => {
     'brookwood', 'brookwood-light', 'copper', 'dark-orange', 'graphite-brass', 'miyara', 'original', 'roon', 'roon-light',
   ]);
   assert.equal(config.themes.find((theme) => theme.id === 'copper').name, 'Obsidian & Copper');
+});
+
+test('the build version changes when any page file changes', async () => {
+  const pageDir = await mkdtemp(path.join(tmpdir(), 'ucweb-page-'));
+  await writeFile(path.join(pageDir, 'app.js'), 'one');
+  const before = await assetVersion(pageDir);
+  assert.match(before, /^[0-9a-f]{16}$/);
+  assert.equal(await assetVersion(pageDir), before);
+  await writeFile(path.join(pageDir, 'app.js'), 'two');
+  assert.notEqual(await assetVersion(pageDir), before);
+  await rm(pageDir, { recursive: true, force: true });
 });
 
 test('signing out clears the cookie', async () => {
