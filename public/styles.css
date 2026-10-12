@@ -607,8 +607,8 @@ svg {
 }
 
 :is(.tile, .control-title)[data-state="ON"] .badge::before {
-  background: var(--accent-fill);
-  box-shadow: 0 0 8px var(--glow);
+  background: var(--on);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--on) 55%, transparent);
 }
 
 :is(.tile, .control-title)[data-state="RUNNING"] .badge {

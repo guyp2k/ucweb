@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { discoverThemes } from '../src/server.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-const TOKENS = ['bg', 'surface', 'surface-raised', 'border', 'text', 'muted', 'accent', 'accent-fill', 'accent-fill-hover', 'on-accent', 'glow', 'ok', 'warn', 'font-body', 'font-display', 'font-label', 'display-weight', 'label-case', 'label-tracking', 'radius'];
+const TOKENS = ['bg', 'surface', 'surface-raised', 'border', 'text', 'muted', 'accent', 'accent-fill', 'accent-fill-hover', 'on-accent', 'glow', 'ok', 'on', 'warn', 'font-body', 'font-display', 'font-label', 'display-weight', 'label-case', 'label-tracking', 'radius'];
 
 function luminance(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -16,6 +16,20 @@ function luminance(hex) {
 function contrast(a, b) {
   const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (light + 0.05) / (dark + 0.05);
+}
+
+function hsl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const light = (max + min) / 2;
+  const sat = delta === 0 ? 0 : delta / (1 - Math.abs(2 * light - 1));
+  let hue = 0;
+  if (delta !== 0 && max === r) hue = 60 * (((g - b) / delta) % 6);
+  else if (delta !== 0 && max === g) hue = 60 * ((b - r) / delta + 2);
+  else if (delta !== 0) hue = 60 * ((r - g) / delta + 4);
+  return { hue: (hue + 360) % 360, sat };
 }
 
 const themes = await discoverThemes(publicDir);
@@ -45,4 +59,19 @@ for (const theme of themes) {
       assert.ok(contrast(color(fg), color(bg)) >= 4.5, `${theme.id}: ${fg} on ${bg} is ${contrast(color(fg), color(bg)).toFixed(2)}:1`);
     }
   });
+
+  test(`the ${theme.name} theme's activity-on dot is a visible green`, async () => {
+    const css = await readFile(path.join(publicDir, 'themes', theme.id, 'theme.css'), 'utf8');
+    const color = (token) => css.match(new RegExp(`--${token}: (#[0-9a-f]{6});`))[1];
+    const { hue, sat } = hsl(color('on'));
+    assert.ok(hue >= 90 && hue <= 160 && sat >= 0.4, `${theme.id}: --on ${color('on')} is not green (hue ${hue.toFixed(0)}, saturation ${sat.toFixed(2)})`);
+    assert.ok(contrast(color('on'), color('surface')) >= 3, `${theme.id}: --on on surface is ${contrast(color('on'), color('surface')).toFixed(2)}:1`);
+  });
 }
+
+test('an activity that is on shows its dot in the theme green', async () => {
+  const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
+  const rule = css.match(/:is\(\.tile, \.control-title\)\[data-state="ON"\] \.badge::before \{([^}]*)\}/);
+  assert.ok(rule, 'styles.css has no rule for the ON dot');
+  assert.match(rule[1], /background: var\(--on\);/);
+});
