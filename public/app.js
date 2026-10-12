@@ -7,7 +7,7 @@ const RECONNECT_MS = [1000, 2000, 5000, 10000];
 const MAX_PIN_LENGTH = 12;
 
 const POWER_MODES = { NORMAL: 'Awake', IDLE: 'Idle', LOW_POWER: 'Low power', SUSPEND: 'Asleep' };
-const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'On battery', NOT_CHARGING: 'Not charging', FULL: 'Full' };
+const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'Discharging', NOT_CHARGING: 'Not charging', FULL: 'Full' };
 const STATE_LABELS = { ON: 'On', OFF: 'Off', RUNNING: 'Working', ERROR: 'Error', UNKNOWN: 'Unknown', COMPLETED: 'Done' };
 const ACTIVE_STATES = new Set(['ON', 'RUNNING']);
 const KEYMAP = {
