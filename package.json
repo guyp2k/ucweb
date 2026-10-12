@@ -1,0 +1,26 @@
+{
+  "name": "ucweb",
+  "version": "0.1.0",
+  "description": "A web remote for Unfolded Circle Remote 3 and Remote Two: start activities, drive the D-pad and watch every status live, from a phone or a desktop browser.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js",
+    "lint": "eslint .",
+    "set-pin": "node src/set-pin.js"
+  },
+  "dependencies": {
+    "ws": "8.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.17.0",
+    "eslint": "9.17.0",
+    "globals": "15.14.0"
+  }
+}

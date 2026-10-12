@@ -1,0 +1,28 @@
+@font-face { font-family: "Inter"; src: url("/fonts/inter.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+@font-face { font-family: "Cormorant Garamond"; src: url("/themes/brookwood/fonts/cormorant-garamond.woff2") format("woff2"); font-weight: 500 600; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("/themes/brookwood/fonts/rajdhani-500.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Rajdhani"; src: url("/themes/brookwood/fonts/rajdhani-600.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+
+:root {
+  color-scheme: light;
+  --bg: #f4efe7;
+  --surface: #efe8dd;
+  --surface-raised: #ffffff;
+  --border: #ddd2c0;
+  --text: #201913;
+  --muted: #63523c;
+  --accent: #6f5320;
+  --accent-fill: #8c6a2a;
+  --accent-fill-hover: #6f5320;
+  --on-accent: #ffffff;
+  --glow: rgba(151, 113, 44, 0.35);
+  --ok: #2f6b1f;
+  --warn: #a8361a;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-label: "Rajdhani", "Arial Narrow", sans-serif;
+  --display-weight: 600;
+  --label-case: uppercase;
+  --label-tracking: 0.14em;
+  --radius: 6px;
+}

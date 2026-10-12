@@ -1,0 +1,25 @@
+@font-face { font-family: "Inter"; src: url("/fonts/inter.woff2") format("woff2"); font-weight: 400 600; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+  --bg: #0d0f14;
+  --surface: #15171f;
+  --surface-raised: #1d212c;
+  --border: #32384b;
+  --text: #f9f9fa;
+  --muted: #dbdadd;
+  --accent: #f34a1c;
+  --accent-fill: #f24a1c;
+  --accent-fill-hover: #f34a1c;
+  --on-accent: #0d0f14;
+  --glow: rgba(242, 74, 28, 0.45);
+  --ok: #798987;
+  --warn: #ef767a;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-label: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --display-weight: 600;
+  --label-case: none;
+  --label-tracking: 0.06em;
+  --radius: 14px;
+}

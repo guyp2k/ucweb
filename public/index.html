@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" data-theme="miyara">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#070c16">
+  <meta name="description" content="Web remote for Unfolded Circle remotes.">
+  <title>ucweb</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/themes/miyara/theme.css" id="theme-css">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/theme-boot.js"></script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ucweb home">
+      <svg class="logo" id="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <g class="logo-waves">
+          <path class="wave wave-1" d="M28.79 10.17 A5 5 0 0 1 35.21 10.17"/>
+          <path class="wave wave-2" d="M26.21 7.11 A9 9 0 0 1 37.79 7.11"/>
+          <path class="wave wave-3" d="M23.64 4.04 A13 13 0 0 1 40.36 4.04"/>
+        </g>
+        <rect class="logo-body" x="20" y="15" width="24" height="45" rx="10"/>
+        <circle class="logo-ring" cx="32" cy="31" r="7"/>
+        <circle class="logo-sweep" cx="32" cy="31" r="7" pathLength="100"/>
+        <circle class="logo-core" cx="32" cy="31" r="2.6"/>
+        <circle class="logo-key" cx="27.5" cy="45" r="1.6"/>
+        <circle class="logo-key" cx="36.5" cy="45" r="1.6"/>
+        <line class="logo-key-line" x1="28" y1="52" x2="36" y2="52"/>
+      </svg>
+      <span class="wordmark">uc<span class="wordmark-accent">web</span></span>
+    </a>
+    <nav class="remote-tabs" id="remote-tabs" aria-label="Remotes"></nav>
+    <div class="topbar-tools">
+      <label class="theme-picker">
+        <span class="label">Theme</span>
+        <select id="theme-select"></select>
+      </label>
+      <button class="text-button" id="sign-out" type="button" aria-label="Sign out" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
+        <span class="sign-out-text">Sign out</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="login" id="login" hidden aria-labelledby="login-title">
+    <form class="login-card" id="login-form" novalidate>
+      <div class="login-logo" id="login-logo"></div>
+      <h1 class="login-title" id="login-title">uc<span class="wordmark-accent">web</span></h1>
+      <p class="login-lead" id="login-lead">Enter your PIN</p>
+      <input class="pin-input" id="pin" type="password" inputmode="numeric" autocomplete="current-password"
+             maxlength="12" aria-label="PIN" required>
+      <div class="keypad" id="keypad">
+        <button type="button" data-digit="1">1</button>
+        <button type="button" data-digit="2">2</button>
+        <button type="button" data-digit="3">3</button>
+        <button type="button" data-digit="4">4</button>
+        <button type="button" data-digit="5">5</button>
+        <button type="button" data-digit="6">6</button>
+        <button type="button" data-digit="7">7</button>
+        <button type="button" data-digit="8">8</button>
+        <button type="button" data-digit="9">9</button>
+        <button type="button" data-key="clear" aria-label="Delete last digit">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11v12H9l-6-6zM12 9l6 6M18 9l-6 6"/></svg>
+        </button>
+        <button type="button" data-digit="0">0</button>
+        <button type="submit" class="keypad-go" aria-label="Sign in">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+      <p class="login-error" id="login-error" role="alert"></p>
+    </form>
+  </section>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <main class="page" id="app" hidden>
+    <section class="status" id="status" aria-live="polite"></section>
+
+    <div class="layout">
+      <section class="panel activities" aria-labelledby="activities-title">
+        <h2 class="eyebrow" id="activities-title">Activities</h2>
+        <div class="activity-grid" id="activity-grid"></div>
+      </section>
+
+      <section class="panel control" id="control" aria-labelledby="control-title">
+        <h2 class="eyebrow" id="control-title">Control</h2>
+        <div class="control-head" id="control-head"></div>
+
+        <div class="pad" id="pad" hidden>
+          <div class="pad-row pad-top">
+            <button class="key" data-button="BACK" aria-label="Back">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
+            </button>
+            <button class="key" data-button="HOME" aria-label="Home">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>
+            </button>
+            <button class="key" data-button="MENU" aria-label="Menu">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
+            </button>
+          </div>
+
+          <div class="dpad">
+            <button class="dpad-key dpad-up" data-button="DPAD_UP" data-repeat aria-label="Up">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+            </button>
+            <button class="dpad-key dpad-left" data-button="DPAD_LEFT" data-repeat aria-label="Left">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+            </button>
+            <button class="dpad-ok" data-button="DPAD_MIDDLE" aria-label="OK">OK</button>
+            <button class="dpad-key dpad-right" data-button="DPAD_RIGHT" data-repeat aria-label="Right">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+            <button class="dpad-key dpad-down" data-button="DPAD_DOWN" data-repeat aria-label="Down">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+
+          <div class="pad-row rockers">
+            <div class="rocker" role="group" aria-label="Volume">
+              <button class="key" data-button="VOLUME_UP" data-repeat aria-label="Volume up">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
+              </button>
+              <span class="rocker-label">Vol</span>
+              <button class="key" data-button="VOLUME_DOWN" data-repeat aria-label="Volume down">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>
+              </button>
+            </div>
+            <button class="key key-round" data-button="MUTE" aria-label="Mute">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg>
+            </button>
+            <div class="rocker" role="group" aria-label="Channel">
+              <button class="key" data-button="CHANNEL_UP" data-repeat aria-label="Channel up">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+              </button>
+              <span class="rocker-label">Ch</span>
+              <button class="key" data-button="CHANNEL_DOWN" data-repeat aria-label="Channel down">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="pad-row transport">
+            <button class="key" data-button="PREV" aria-label="Previous">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>
+            </button>
+            <button class="key" data-button="STOP" aria-label="Stop">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>
+            </button>
+            <button class="key key-primary" data-button="PLAY" aria-label="Play or pause">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l9-7zM16 6v12M20 6v12"/></svg>
+            </button>
+            <button class="key" data-button="RECORD" aria-label="Record">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg>
+            </button>
+            <button class="key" data-button="NEXT" aria-label="Next">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>
+            </button>
+          </div>
+          <p class="hint">Keyboard: arrows, Enter, Backspace, + and -, M, Space.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="assertive" hidden></div>
+</body>
+</html>

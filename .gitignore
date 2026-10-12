@@ -1,0 +1,7 @@
+node_modules/
+reference/
+keys/
+*.key
+pin.hash
+session.secret
+deploy/

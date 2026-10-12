@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>ucweb</Name>
+  <Repository>ghcr.io/guyp2k/ucweb:latest</Repository>
+  <Registry>https://github.com/guyp2k/ucweb/pkgs/container/ucweb</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/guyp2k/ucweb/issues</Support>
+  <Project>https://github.com/guyp2k/ucweb</Project>
+  <Overview>A web remote for Unfolded Circle Remote 3 and Remote Two. Start and stop activities, use the D-pad, volume and transport buttons, and watch connection, battery and power status live, from a phone or a desktop browser. Sign in with a PIN. Before the first start, put one API key per remote in the config folder under keys (see the project page), then set the PIN with: docker exec -it ucweb npm run set-pin. Keep it on your LAN: never forward its port to the internet.</Overview>
+  <Category>HomeAutomation Tools:Utilities</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/guyp2k/ucweb/main/unraid/ucweb.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/guyp2k/ucweb/main/unraid/ucweb.png</Icon>
+  <ExtraParams>--init</ExtraParams>
+  <PostArgs/>
+  <Config Name="Remotes" Target="UC_REMOTES" Default="" Mode="" Description="IP addresses of your remotes, comma separated, for example 192.168.1.20,192.168.1.21." Type="Variable" Display="always" Required="true" Mask="false"></Config>
+  <Config Name="Config" Target="/config" Default="/mnt/user/appdata/ucweb" Mode="rw" Description="API keys (keys/&lt;remote hostname&gt;.key), the PIN hash and the session secret." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/ucweb</Config>
+  <Config Name="Web UI port" Target="8080" Default="8080" Mode="tcp" Description="Port for the web UI in bridge mode. On a custom network with its own IP the UI is at that IP on port 8080." Type="Port" Display="always" Required="true" Mask="false">8080</Config>
+  <Config Name="Default theme" Target="UCWEB_THEME" Default="miyara" Mode="" Description="miyara, original, copper, roon, roon-light, dark-orange, graphite-brass, brookwood or brookwood-light. Each browser can pick its own from the menu." Type="Variable" Display="advanced" Required="false" Mask="false">miyara</Config>
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User that owns the config folder. 99 is Unraid's nobody." Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group that owns the config folder. 100 is Unraid's users." Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+</Container>

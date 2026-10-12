@@ -1,0 +1,26 @@
+@font-face { font-family: "Manrope"; src: url("/themes/graphite-brass/fonts/manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Young Serif"; src: url("/themes/graphite-brass/fonts/young-serif.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+  --bg: #16181b;
+  --surface: #1e2125;
+  --surface-raised: #282c31;
+  --border: #3f454d;
+  --text: #edece8;
+  --muted: #e0ded7;
+  --accent: #d3ae69;
+  --accent-fill: #c9a45c;
+  --accent-fill-hover: #d6b46e;
+  --on-accent: #17191c;
+  --glow: rgba(211, 174, 105, 0.45);
+  --ok: #798987;
+  --warn: #ef767a;
+  --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --font-label: "Manrope", system-ui, sans-serif;
+  --display-weight: 400;
+  --label-case: uppercase;
+  --label-tracking: 0.12em;
+  --radius: 10px;
+}

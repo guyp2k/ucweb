@@ -1,0 +1,10 @@
+{
+  "name": "ucweb",
+  "short_name": "ucweb",
+  "description": "Web remote for Unfolded Circle remotes.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070c16",
+  "theme_color": "#070c16",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
