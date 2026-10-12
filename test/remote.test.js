@@ -43,19 +43,42 @@ test('connecting loads the device, battery, power mode and activities', async ()
   assert.equal(snapshot.name, 'Test Den');
   assert.equal(snapshot.model, 'UCR3');
   assert.deepEqual(snapshot.firmware, { core: '1.0', ui: '1.1', os: '2.0' });
-  assert.deepEqual(snapshot.battery, { capacity: 80, status: 'DISCHARGING', powerSupply: false });
+  assert.deepEqual(snapshot.battery, { capacity: 80, status: 'DISCHARGING' });
+  assert.equal(snapshot.powerSupply, false);
+  assert.equal(snapshot.batteryProblem, null);
   assert.equal(snapshot.powerMode, 'NORMAL');
   assert.deepEqual(snapshot.activities, [{ id: 'act.tv', name: 'Watch TV', description: 'Watch TV description', state: 'OFF' }]);
   assert.equal(snapshot.problem, null);
 });
 
-test('a remote that cannot read its battery stays online with the battery unknown', async () => {
+test('a remote that cannot read its battery stays online with the battery unknown and the reason kept', async () => {
   await connect({ batteryError: true });
   const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
   assert.equal(snapshot.battery, null);
+  assert.equal(snapshot.batteryProblem, 'Test Den answered HTTP 400 to GET /api/system/power/battery: Invalid argument (os error 22)');
   assert.equal(snapshot.powerMode, 'NORMAL');
   assert.equal(snapshot.activities.length, 1);
   assert.equal(snapshot.problem, null);
+});
+
+test('the power supply is reported even when the battery cannot be read', async () => {
+  fake = await startFakeRemote({ batteryError: true });
+  fake.state.powerSupply = true;
+  await writeFile(path.join(keysDir, `${HOSTNAME}.key`), KEY);
+  remote = new Remote({ address: fake.address, keysDir, reconnectDelays: [20] });
+  remote.start();
+  const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
+  assert.equal(snapshot.battery, null);
+  assert.equal(snapshot.powerSupply, true);
+});
+
+test('a battery reading that arrives later clears the battery problem', async () => {
+  await connect({ batteryError: true });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  fake.emit('battery_status', { capacity: 55, status: 'CHARGING', power_supply: true });
+  await waitFor(() => remote.snapshot().battery?.capacity === 55, { message: 'battery' });
+  assert.equal(remote.snapshot().batteryProblem, null);
+  assert.equal(remote.snapshot().powerSupply, true);
 });
 
 test('every activity is loaded across pages of 100', async () => {
@@ -122,7 +145,8 @@ test('battery and power mode events update the status', async () => {
   await waitFor(() => remote.snapshot().online, { message: 'online' });
   fake.emit('battery_status', { capacity: 42, status: 'CHARGING', power_supply: true });
   await waitFor(() => remote.snapshot().battery?.capacity === 42, { message: 'battery' });
-  assert.deepEqual(remote.snapshot().battery, { capacity: 42, status: 'CHARGING', powerSupply: true });
+  assert.deepEqual(remote.snapshot().battery, { capacity: 42, status: 'CHARGING' });
+  assert.equal(remote.snapshot().powerSupply, true);
   fake.emit('power_mode_change', { mode: 'LOW_POWER' });
   await waitFor(() => remote.snapshot().powerMode === 'LOW_POWER', { message: 'power mode' });
 });
