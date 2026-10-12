@@ -7,7 +7,7 @@ const RECONNECT_MS = [1000, 2000, 5000, 10000];
 const MAX_PIN_LENGTH = 12;
 
 const POWER_MODES = { NORMAL: 'Awake', IDLE: 'Idle', LOW_POWER: 'Low power', SUSPEND: 'Asleep' };
-const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'On battery', NOT_CHARGING: 'Not charging', FULL: 'Full' };
+const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'Discharging', NOT_CHARGING: 'Not charging', FULL: 'Full' };
 const STATE_LABELS = { ON: 'On', OFF: 'Off', RUNNING: 'Working', ERROR: 'Error', UNKNOWN: 'Unknown', COMPLETED: 'Done' };
 const ACTIVE_STATES = new Set(['ON', 'RUNNING']);
 const KEYMAP = {
@@ -261,8 +261,8 @@ function selectRemote(id) {
   render();
 }
 
-function batteryText(battery) {
-  if (!battery) return 'Unknown';
+function batteryText(battery, problem) {
+  if (!battery) return problem ? 'Not readable' : 'Unknown';
   const status = BATTERY_STATUS[battery.status] ?? battery.status;
   return status ? `${battery.capacity}% ${status.toLowerCase()}` : `${battery.capacity}%`;
 }
@@ -297,7 +297,9 @@ function renderStatus(remote) {
     return;
   }
   const connection = statusChip('Connection', remote.online ? 'Online' : 'Offline', remote.online ? 'is-ok' : 'is-warn');
-  const battery = statusChip('Battery', batteryText(remote.battery), remote.battery?.capacity <= 15 ? 'is-warn' : '');
+  const battery = statusChip('Battery', batteryText(remote.battery, remote.batteryProblem), remote.battery?.capacity <= 15 || remote.batteryProblem ? 'is-warn' : '');
+  if (remote.batteryProblem) battery.append(el('span', 'chip-note', 'The remote answers with an error when asked for its battery level.'));
+  if (remote.batteryProblem) battery.title = remote.batteryProblem;
   if (remote.battery) {
     const meter = el('span', 'meter');
     const fill = el('span', 'meter-fill');
@@ -305,7 +307,7 @@ function renderStatus(remote) {
     meter.append(fill);
     battery.append(meter);
   }
-  const powerSupply = statusChip('Power supply', remote.battery?.powerSupply === true ? 'Docked or plugged in' : remote.battery?.powerSupply === false ? 'Battery only' : 'Unknown');
+  const powerSupply = statusChip('Power supply', remote.powerSupply === true ? 'Docked or plugged in' : remote.powerSupply === false ? 'Battery only' : 'Unknown');
   const mode = statusChip('Remote', POWER_MODES[remote.powerMode] ?? remote.powerMode ?? 'Unknown');
   const device = statusChip('Device', [remote.model, remote.firmware?.os && `OS ${remote.firmware.os}`].filter(Boolean).join(', ') || 'Unknown', 'chip-wide');
   if (remote.firmware) device.title = `Core ${remote.firmware.core}, UI ${remote.firmware.ui}, OS ${remote.firmware.os}`;

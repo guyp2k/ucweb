@@ -32,6 +32,7 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
     entityRequests: 0,
     battery: { capacity: 80, status: 'DISCHARGING', power_supply: false },
     batteryError,
+    powerSupply: false,
     powerMode: 'NORMAL',
     commands: [],
     activityDetailRequests: 0,
@@ -74,7 +75,7 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
       if (state.batteryError) return send(res, 400, { code: 'BAD_REQUEST', message: 'Invalid argument (os error 22)' });
       return send(res, 200, state.battery);
     }
-    if (url.pathname === '/api/system/power') return send(res, 200, { mode: state.powerMode, power_supply: false });
+    if (url.pathname === '/api/system/power') return send(res, 200, { mode: state.powerMode, power_supply: state.powerSupply });
     const command = url.pathname.match(/^\/api\/entities\/([^/]+)\/command$/);
     if (command && req.method === 'PUT') {
       let body = '';
@@ -104,7 +105,7 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
             req_id: message.id,
             msg: 'power_mode',
             code: 200,
-            msg_data: { mode: state.powerMode, battery, power_supply: false },
+            msg_data: { mode: state.powerMode, battery, power_supply: state.powerSupply },
           }));
         }
       });

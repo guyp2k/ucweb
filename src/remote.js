@@ -30,7 +30,7 @@ export function toActivity(entity) {
 
 export function toBattery(data) {
   if (!data || typeof data.capacity !== 'number') return null;
-  return { capacity: data.capacity, status: data.status ?? null, powerSupply: data.power_supply ?? null };
+  return { capacity: data.capacity, status: data.status ?? null };
 }
 
 const FALLBACKS = {
@@ -100,6 +100,8 @@ export class Remote extends EventEmitter {
       online: false,
       problem: null,
       battery: null,
+      batteryProblem: null,
+      powerSupply: null,
       powerMode: null,
       activities: new Map(),
     };
@@ -269,18 +271,29 @@ export class Remote extends EventEmitter {
     ]);
     this.#state.activities = activities;
     this.#mappings.clear();
-    this.#state.battery = toBattery(battery);
-    this.#state.powerMode = power?.mode ?? null;
+    this.#state.battery = toBattery(battery.data);
+    this.#state.batteryProblem = battery.problem;
+    this.#state.powerSupply = power.data?.power_supply ?? battery.data?.power_supply ?? null;
+    this.#state.powerMode = power.data?.mode ?? null;
   }
 
   async #optional(pathname) {
     try {
-      return (await this.#request('GET', pathname)).data;
+      return { data: (await this.#request('GET', pathname)).data, problem: null };
     } catch (error) {
       if (error.status !== 502) throw error;
       this.emit('warning', error.message);
-      return null;
+      return { data: null, problem: error.message };
     }
+  }
+
+  #applyBattery(data) {
+    const battery = toBattery(data);
+    if (battery) {
+      this.#state.battery = battery;
+      this.#state.batteryProblem = null;
+    }
+    if (typeof data?.power_supply === 'boolean') this.#state.powerSupply = data.power_supply;
   }
 
   #openSocket() {
@@ -366,11 +379,12 @@ export class Remote extends EventEmitter {
     } else if (message.msg === 'entity_change' && !data.entity_id && !data.entity_type) {
       this.#reload();
     } else if (message.msg === 'battery_status') {
-      this.#state.battery = toBattery(data);
+      this.#applyBattery(data);
       this.#emitChange();
     } else if (message.msg === 'power_mode' || message.msg === 'power_mode_change') {
       this.#state.powerMode = data.mode ?? this.#state.powerMode;
-      if (data.battery) this.#state.battery = toBattery(data.battery);
+      if (typeof data.power_supply === 'boolean') this.#state.powerSupply = data.power_supply;
+      if (data.battery) this.#applyBattery(data.battery);
       this.#emitChange();
       if (data.wakeup) this.#reload();
     }

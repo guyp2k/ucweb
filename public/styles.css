@@ -383,6 +383,12 @@ svg {
   color: var(--warn);
 }
 
+.chip-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
 .meter {
   height: 4px;
   border-radius: 2px;
