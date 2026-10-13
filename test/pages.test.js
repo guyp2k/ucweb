@@ -137,8 +137,8 @@ test('opening the pages loads the layout and the state of every widget on them',
   const { pages, entities: states } = await remote.pages('act.tv');
   assert.equal(pages.length, 2);
   assert.deepEqual(Object.keys(states).sort(), ['media.dmp', 'select.output', 'sensor.volume']);
-  assert.deepEqual(states['sensor.volume'], { id: 'sensor.volume', type: 'sensor', name: 'DMP Volume', state: 'ON', value: '42', unit: '%' });
-  assert.deepEqual(states['select.output'], { id: 'select.output', type: 'select', name: 'Output', state: 'ON', option: 'XLR' });
+  assert.deepEqual(states['sensor.volume'], { id: 'sensor.volume', type: 'sensor', name: 'DMP Volume', state: 'ON', deviceClass: null, icon: null, value: '42', unit: '%' });
+  assert.deepEqual(states['select.output'], { id: 'select.output', type: 'select', name: 'Output', state: 'ON', deviceClass: null, icon: null, option: 'XLR', options: ['XLR', 'RCA'] });
   const player = states['media.dmp'];
   assert.equal(player.title, 'So What');
   assert.equal(player.artist, 'Miles Davis');
@@ -206,7 +206,7 @@ test('live changes are sent for widgets on opened pages and ignored for anything
   fake.emit('entity_change', { entity_type: 'sensor', entity_id: 'sensor.volume', event_type: 'CHANGE', new_state: { attributes: { value: '51' } } });
   fake.emit('entity_change', { entity_type: 'media_player', entity_id: 'media.dmp', event_type: 'CHANGE', new_state: { attributes: { media_title: 'Blue in Green' } } });
   await waitFor(() => seen.length === 2, { message: 'two changes' });
-  assert.deepEqual(seen[0], { id: 'sensor.volume', type: 'sensor', name: 'DMP Volume', state: 'ON', value: '51', unit: '%' });
+  assert.deepEqual(seen[0], { id: 'sensor.volume', type: 'sensor', name: 'DMP Volume', state: 'ON', deviceClass: null, icon: null, value: '51', unit: '%' });
   assert.equal(seen[1].title, 'Blue in Green');
   assert.equal(seen[1].artist, 'Miles Davis');
   fake.emit('entity_change', { entity_type: 'select', entity_id: 'select.output', event_type: 'DELETE' });
@@ -283,7 +283,7 @@ test('a player reports only the controls ucweb offers that it supports, with its
   await connect();
   const { entities: states } = await remote.pages('act.tv');
   const player = states['media.dmp'];
-  assert.deepEqual(player.features, ['play_pause', 'previous', 'next', 'volume_up_down', 'mute_toggle', 'seek', 'volume', 'select_source']);
+  assert.deepEqual(player.features, ['play_pause', 'previous', 'next', 'volume_up_down', 'mute_toggle', 'seek', 'volume', 'select_source', 'on_off']);
   assert.equal(player.source, 'Internal player');
   assert.deepEqual(player.sources, ['Internal player', 'USB-B In', 'Bluetooth In']);
   assert.equal(player.volume, 42);
@@ -349,7 +349,7 @@ test('unknown actions and players not on an open page are refused', async () => 
   await connect();
   await assert.rejects(remote.playerCommand('media.dmp', 'play_pause'), { status: 404 });
   await remote.pages('act.tv');
-  for (const action of ['off', 'toggle', 'select_source', '__proto__', 'toString', 'constructor', undefined]) {
+  for (const action of ['explode', 'power', 'select_source', '__proto__', 'toString', 'constructor', undefined]) {
     await assert.rejects(remote.playerCommand('media.dmp', action), { status: 400 }, String(action));
   }
   await assert.rejects(remote.playerCommand('sensor.volume', 'play_pause'), { status: 404 });

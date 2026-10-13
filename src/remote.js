@@ -5,8 +5,23 @@ import path from 'node:path';
 import WebSocket from 'ws';
 
 const PAGE_SIZE = 100;
-const CHANNELS = ['entity_activity', 'entity_media_player', 'entity_sensor', 'entity_select', 'battery_status'];
+const CHANNELS = [
+  'entity_activity', 'entity_media_player', 'entity_sensor', 'entity_select', 'entity_light', 'entity_switch', 'entity_climate',
+  'entity_cover', 'entity_button', 'entity_macro', 'entity_remote', 'battery_status', 'profiles', 'integrations',
+];
 const WIDGET_ENTITY_TYPES = new Set(['media_player', 'sensor', 'select']);
+const PROFILE_EVENTS = new Set(['profile_change', 'active_profile_change']);
+const INTEGRATION_EVENTS = new Set(['integration_change', 'integration_driver_change']);
+const POWER_TYPES = new Set(['light', 'switch']);
+const CLIMATE_MODES = [['on_off', 'OFF'], ['heat', 'HEAT'], ['cool', 'COOL'], ['target_temperature_range', 'HEAT_COOL'], ['fan', 'FAN']];
+const DEVICE_FEATURES = {
+  light: ['on_off', 'toggle', 'dim'],
+  switch: ['on_off', 'toggle'],
+  climate: ['on_off', 'heat', 'cool', 'current_temperature', 'target_temperature'],
+  cover: ['open', 'close', 'stop', 'position'],
+  remote: ['on_off', 'toggle'],
+};
+const TEMPERATURE_UNITS = { CELSIUS: '°C', FAHRENHEIT: '°F' };
 const SYSTEM_COMMANDS = new Set(['REBOOT', 'POWER_OFF']);
 const ITEM_TYPES = new Set(['text', 'icon', 'media_player', 'sensor', 'select']);
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
@@ -26,6 +41,9 @@ const PLAYER_ACTIONS = {
   repeat: { feature: 'repeat', param: 'repeat' },
   select_source: { feature: 'select_source', param: 'source' },
   play_media: { feature: 'play_media', param: 'media_id' },
+  on: { feature: 'on_off' },
+  off: { feature: 'on_off' },
+  toggle: { feature: 'toggle' },
 };
 const PLAYER_FEATURES = [...new Set(Object.values(PLAYER_ACTIONS).map((action) => action.feature)), 'browse_media'];
 const BROWSE_PAGE = 30;
@@ -99,7 +117,7 @@ export function resolveButtons(buttonMapping, dpadDevice) {
 const whole = (value, min) => (Number.isInteger(value) && value >= min ? value : null);
 
 function iconHint(command) {
-  const source = command?.params?.source;
+  const source = command?.params?.source ?? command?.params?.command;
   if (typeof source === 'string') return source.trim() || null;
   return typeof command?.cmd_id === 'string' && command.cmd_id ? command.cmd_id : null;
 }
@@ -162,6 +180,107 @@ export function toPages(ui) {
 
 const finite = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
 
+function deviceCommand(entity, command) {
+  if (!command || typeof command.cmd_id !== 'string' || !command.cmd_id || command.entity_id) return command;
+  if (/^remote\.[a-z_]+$/.test(command.cmd_id)) return { entity_id: entity.entity_id, cmd_id: command.cmd_id, params: command.params };
+  const features = Array.isArray(entity.features) ? entity.features : [];
+  const send = features.includes('send') && !features.includes('send_cmd') ? 'remote.send' : 'remote.send_cmd';
+  return { entity_id: entity.entity_id, cmd_id: send, params: { ...command.params, command: command.cmd_id } };
+}
+
+export function deviceInterface(entity) {
+  const pages = Array.isArray(entity?.options?.user_interface?.pages) ? entity.options.user_interface.pages : [];
+  return {
+    pages: pages.map((page) => ({
+      ...page,
+      items: (Array.isArray(page?.items) ? page.items : []).map((item) => (item?.command ? { ...item, command: deviceCommand(entity, item.command) } : item)),
+    })),
+  };
+}
+
+export function deviceMapping(entity) {
+  const mapping = Array.isArray(entity?.options?.button_mapping) ? entity.options.button_mapping : [];
+  return mapping
+    .filter((entry) => typeof entry?.button === 'string')
+    .map((entry) => (entry.short_press ? { ...entry, short_press: deviceCommand(entity, entry.short_press) } : entry));
+}
+
+const text = (value) => (typeof value === 'string' && value ? value : null);
+
+export function toProfilePages(rawPages, rawGroups = []) {
+  const groups = new Map((Array.isArray(rawGroups) ? rawGroups : [])
+    .filter((group) => typeof group?.group_id === 'string')
+    .map((group) => [group.group_id, group]));
+  const byPos = (a, b) => (whole(a?.pos, 0) ?? 0) - (whole(b?.pos, 0) ?? 0);
+  return (Array.isArray(rawPages) ? rawPages : [])
+    .filter((page) => typeof page?.page_id === 'string' && page.page_id)
+    .sort(byPos)
+    .map((page) => ({
+      id: page.page_id,
+      name: localizedText(page.name) ?? 'Page',
+      items: (Array.isArray(page.items) ? [...page.items] : []).sort(byPos).flatMap((item) => {
+        if (typeof item?.entity_id === 'string' && item.entity_id) return [{ entityId: item.entity_id }];
+        const group = typeof item?.group_id === 'string' ? groups.get(item.group_id) : null;
+        if (!group) return [];
+        const entityIds = (Array.isArray(group.entities) ? group.entities : []).filter((id) => typeof id === 'string' && id);
+        return [{ group: { id: group.group_id, name: localizedText(group.name) ?? 'Group', entityIds } }];
+      }),
+    }));
+}
+
+const DRIVER_KINDS = { LOCAL: 'Built in', CUSTOM: 'Custom', EXTERNAL: 'External' };
+const DEVICE_STATES = new Set(['UNKNOWN', 'CONNECTING', 'CONNECTED', 'DISCONNECTED', 'ERROR']);
+const DRIVER_STATES = new Set(['NOT_CONFIGURED', 'IDLE', 'CONNECTING', 'ACTIVE', 'RECONNECTING', 'ERROR']);
+
+function driverFacts(driver) {
+  return {
+    name: localizedText(driver?.name),
+    version: text(driver?.version),
+    developer: text(driver?.developer_name),
+    kind: DRIVER_KINDS[driver?.driver_type] ?? null,
+  };
+}
+
+export function toIntegrations(drivers, instances) {
+  const driverList = (Array.isArray(drivers) ? drivers : []).filter((driver) => typeof driver?.driver_id === 'string');
+  const instanceList = (Array.isArray(instances) ? instances : []).filter((instance) => typeof instance?.integration_id === 'string');
+  const byDriver = new Map(driverList.map((driver) => [driver.driver_id, driver]));
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const integrations = instanceList.map((instance) => {
+    const facts = driverFacts(byDriver.get(instance.driver_id));
+    return {
+      id: instance.integration_id,
+      ...facts,
+      name: facts.name ?? localizedText(instance.name) ?? instance.integration_id,
+      state: DEVICE_STATES.has(instance.device_state) ? instance.device_state : null,
+      enabled: typeof instance.enabled === 'boolean' ? instance.enabled : null,
+    };
+  }).sort(byName);
+  const used = new Set(instanceList.map((instance) => instance.driver_id));
+  const idle = driverList.filter((driver) => !used.has(driver.driver_id)).map((driver) => {
+    const facts = driverFacts(driver);
+    return {
+      id: driver.driver_id,
+      ...facts,
+      name: facts.name ?? driver.driver_id,
+      state: DRIVER_STATES.has(driver.driver_state) ? driver.driver_state : null,
+      enabled: typeof driver.enabled === 'boolean' ? driver.enabled : null,
+    };
+  }).sort(byName);
+  return { integrations, drivers: idle };
+}
+
+const DEVICE_ACTIONS = {
+  light: { on: {}, off: {}, toggle: {}, brightness: { features: ['dim'] } },
+  switch: { on: {}, off: {}, toggle: {} },
+  climate: { on: { features: ['on_off'] }, off: { features: ['on_off'] }, mode: {}, target: { features: ['target_temperature'] } },
+  cover: { open: { features: ['open'] }, close: { features: ['close'] }, stop: { features: ['stop'] }, position: { features: ['position'] } },
+  button: { push: {} },
+  macro: { run: {} },
+  remote: { on: { features: ['on_off'] }, off: { features: ['on_off'] }, toggle: { features: ['toggle', 'on_off'] } },
+  select: { select_option: {} },
+};
+
 function mediaPosition(watched, now) {
   const attributes = watched.attributes;
   const position = finite(attributes.media_position);
@@ -202,6 +321,8 @@ export function toEntityView(watched, now = Date.now(), art = loadableArt(watche
     type: watched.entity_type,
     name: localizedText(watched.name) ?? watched.entity_id,
     state: attributes.state ?? null,
+    deviceClass: watched.device_class ?? null,
+    icon: watched.icon?.startsWith('uc:') ? watched.icon : null,
   };
   if (watched.entity_type === 'media_player') {
     const duration = finite(attributes.media_duration);
@@ -229,8 +350,53 @@ export function toEntityView(watched, now = Date.now(), art = loadableArt(watche
     view.unit = typeof unit === 'string' && unit ? unit : null;
   } else if (watched.entity_type === 'select') {
     view.option = typeof attributes.current_option === 'string' && attributes.current_option ? attributes.current_option : null;
+    view.options = selectOptions(attributes);
+  } else if (Object.hasOwn(DEVICE_FEATURES, watched.entity_type)) {
+    Object.assign(view, deviceView(watched, attributes));
   }
   return view;
+}
+
+function selectOptions(attributes) {
+  return Array.isArray(attributes.options) ? attributes.options.filter((option) => typeof option === 'string' && option) : [];
+}
+
+function climateModes(features) {
+  return CLIMATE_MODES.filter(([feature]) => features.includes(feature)).map(([, mode]) => mode);
+}
+
+function deviceView(watched, attributes) {
+  const type = watched.entity_type;
+  const features = DEVICE_FEATURES[type].filter((feature) => watched.features.includes(feature));
+  if (POWER_TYPES.has(type)) {
+    const brightness = finite(attributes.brightness);
+    return {
+      features: [...new Set(['on_off', 'toggle', ...features])],
+      brightness: type === 'light' && brightness !== null ? Math.round((Math.min(255, Math.max(0, brightness)) / 255) * 100) : null,
+    };
+  }
+  if (type === 'climate') {
+    const options = watched.options ?? {};
+    return {
+      features,
+      current: finite(attributes.current_temperature),
+      target: finite(attributes.target_temperature),
+      min: finite(options.min_temperature),
+      max: finite(options.max_temperature),
+      step: finite(options.target_temperature_step) > 0 ? options.target_temperature_step : null,
+      unit: TEMPERATURE_UNITS[options.temperature_unit] ?? null,
+      modes: climateModes(watched.features),
+    };
+  }
+  if (type === 'cover') {
+    const position = finite(attributes.position);
+    return { features, position: position === null ? null : Math.min(100, Math.max(0, Math.round(position))) };
+  }
+  const ui = watched.options?.user_interface;
+  return {
+    features,
+    controllable: (Array.isArray(ui?.pages) && ui.pages.length > 0) || (Array.isArray(watched.options?.button_mapping) && watched.options.button_mapping.length > 0),
+  };
 }
 
 function sourceList(attributes) {
@@ -241,6 +407,8 @@ function toWatched(entity, now) {
   return {
     entity_id: entity.entity_id,
     entity_type: entity.entity_type,
+    device_class: typeof entity.device_class === 'string' ? entity.device_class : null,
+    icon: typeof entity.icon === 'string' ? entity.icon : null,
     name: entity.name,
     options: entity.options ?? null,
     features: Array.isArray(entity.features) ? entity.features.filter((feature) => typeof feature === 'string') : [],
@@ -291,6 +459,7 @@ export class Remote extends EventEmitter {
   #images = new Map();
   #browseMemory = new Map();
   #artKeys = new Map();
+  #entityLoad = null;
   #state;
 
   constructor({
@@ -362,21 +531,21 @@ export class Remote extends EventEmitter {
     await this.#request('POST', `/api/system?cmd=${cmd}`);
   }
 
-  async buttons(activityId) {
-    const mapping = await this.#mapping(activityId);
+  async buttons(targetId, kind = 'activity') {
+    const mapping = await this.#mapping(targetId, kind);
     return mapping.map((entry) => ({ button: entry.button, mapped: entry.command !== null, fallback: entry.fallback }));
   }
 
-  async press(activityId, button) {
-    const activity = this.#requireActivity(activityId);
-    const entry = (await this.#mapping(activityId)).find((candidate) => candidate.button === button);
-    if (!entry) throw new HttpError(404, `${activity.name} has no ${button} button.`);
-    if (!entry.command) throw new HttpError(409, `${button} does nothing in ${activity.name}.`);
+  async press(targetId, button, kind = 'activity') {
+    const target = await this.#target(targetId, kind);
+    const entry = (await this.#mapping(targetId, kind)).find((candidate) => candidate.button === button);
+    if (!entry) throw new HttpError(404, `${target.name} has no ${button} button.`);
+    if (!entry.command) throw new HttpError(409, `${button} does nothing in ${target.name}.`);
     await this.#command(entry.command);
   }
 
-  async pages(activityId) {
-    const ui = await this.#ui(activityId);
+  async pages(targetId, kind = 'activity') {
+    const ui = await this.#ui(targetId, kind);
     const now = Date.now();
     const entities = {};
     await Promise.all(ui.entityIds.map(async (entityId) => {
@@ -391,11 +560,11 @@ export class Remote extends EventEmitter {
     return { pages: ui.pages, entities };
   }
 
-  async pressItem(activityId, pageId, index) {
-    const activity = this.#requireActivity(activityId);
-    const ui = await this.#ui(activityId);
+  async pressItem(targetId, pageId, index, kind = 'activity') {
+    const target = await this.#target(targetId, kind);
+    const ui = await this.#ui(targetId, kind);
     const page = ui.pages.find((candidate) => candidate.id === pageId);
-    if (!page) throw new HttpError(404, `${activity.name} has no page ${pageId}.`);
+    if (!page) throw new HttpError(404, `${target.name} has no page ${pageId}.`);
     const command = ui.commands.get(`${pageId}\n${index}`);
     if (!command) throw new HttpError(409, `That item on ${page.name ?? 'this page'} does nothing.`);
     await this.#command(command);
@@ -519,6 +688,118 @@ export class Remote extends EventEmitter {
     return this.#loadImage(url);
   }
 
+  async profilePages() {
+    const { data: profiles } = await this.#request('GET', '/api/profiles');
+    const list = (Array.isArray(profiles) ? profiles : []).filter((profile) => typeof profile?.profile_id === 'string' && profile.profile_id);
+    if (list.length === 0) return { profile: null, pages: [], entities: {} };
+    let active = null;
+    try {
+      active = (await this.#request('GET', '/api/profiles/active')).data;
+    } catch (error) {
+      if (error.status !== 502) throw error;
+    }
+    const profile = list.find((candidate) => candidate.profile_id === active?.profile_id) ?? list[0];
+    const base = `/api/profiles/${encodeURIComponent(profile.profile_id)}`;
+    const { data: rawPages } = await this.#request('GET', `${base}/pages`);
+    const grouped = (Array.isArray(rawPages) ? rawPages : []).some((page) => Array.isArray(page?.items) && page.items.some((item) => item?.group_id));
+    const groups = grouped ? (await this.#request('GET', `${base}/groups`)).data : [];
+    const pages = toProfilePages(rawPages, groups);
+    await this.#loadEntities();
+    const now = Date.now();
+    const entities = {};
+    const typed = (entityId) => {
+      const watched = this.#watched.get(entityId);
+      const type = this.#state.activities.has(entityId) ? 'activity' : watched?.entity_type ?? null;
+      if (watched && type !== 'activity') entities[entityId] = this.#view(watched, now);
+      return { entityId, type };
+    };
+    for (const page of pages) {
+      page.items = page.items.map((item) => (item.group
+        ? { group: { id: item.group.id, name: item.group.name, items: item.group.entityIds.map(typed) } }
+        : typed(item.entityId)));
+    }
+    return { profile: localizedText(profile.name), pages, entities };
+  }
+
+  async entities() {
+    await this.#loadEntities();
+    const now = Date.now();
+    const entities = [...this.#watched.values()]
+      .filter((watched) => watched.entity_type !== 'activity')
+      .map((watched) => this.#view(watched, now))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { entities };
+  }
+
+  async integrations() {
+    const [drivers, instances] = await Promise.all([this.#pagedList('/api/intg/drivers'), this.#pagedList('/api/intg/instances')]);
+    return toIntegrations(drivers, instances);
+  }
+
+  async deviceCommand(entityId, action, value) {
+    await this.#loadEntities();
+    const watched = this.#watched.get(entityId);
+    const type = watched?.entity_type;
+    if (!watched || type === 'activity' || type === 'media_player') throw new HttpError(404, `${this.#label} has no device ${entityId}.`);
+    const name = localizedText(watched.name) ?? entityId;
+    const actions = DEVICE_ACTIONS[type];
+    if (!actions) throw new HttpError(409, `${name} has nothing to control.`);
+    const rule = Object.hasOwn(actions, action) ? actions[action] : null;
+    if (!rule) throw new HttpError(400, `Send one of ${Object.keys(actions).join(', ')}.`);
+    if (rule.features && !rule.features.some((feature) => watched.features.includes(feature))) {
+      throw new HttpError(409, `${name} cannot ${action.replace('_', ' ')}.`);
+    }
+    let command = { entityId, cmdId: `${type}.${action}` };
+    if (action === 'brightness') {
+      if (!Number.isInteger(value) || value < 0 || value > 100) throw new HttpError(400, 'Send a brightness from 0 to 100.');
+      command = { entityId, cmdId: 'light.on', params: { brightness: Math.round((value / 100) * 255) } };
+    } else if (action === 'mode') {
+      const modes = climateModes(watched.features);
+      if (!modes.includes(value)) throw new HttpError(400, `${name} can be set to ${modes.join(', ') || 'no mode'}.`);
+      command = value === 'OFF' ? { entityId, cmdId: 'climate.off' } : { entityId, cmdId: 'climate.hvac_mode', params: { hvac_mode: value } };
+    } else if (action === 'target') {
+      const view = toEntityView(watched);
+      const low = view.min ?? -Infinity;
+      const high = view.max ?? Infinity;
+      if (finite(value) === null || value < low || value > high) throw new HttpError(400, `Send a temperature from ${view.min ?? 'any'} to ${view.max ?? 'any'}.`);
+      command = { entityId, cmdId: 'climate.target_temperature', params: { temperature: value } };
+    } else if (action === 'position') {
+      if (!Number.isInteger(value) || value < 0 || value > 100) throw new HttpError(400, 'Send a position from 0 to 100.');
+      command.params = { position: value };
+    } else if (action === 'select_option') {
+      if (typeof value !== 'string' || !selectOptions(watched.attributes).includes(value)) {
+        throw new HttpError(400, `${name} has no option called ${JSON.stringify(value)}.`);
+      }
+      command.params = { option: value };
+    }
+    await this.#command(command);
+  }
+
+  #loadEntities() {
+    this.#entityLoad ??= (async () => {
+      const list = await this.#pagedList('/api/entities');
+      const now = Date.now();
+      for (const entity of list) {
+        if (typeof entity?.entity_id === 'string' && typeof entity.entity_type === 'string') this.#watched.set(entity.entity_id, toWatched(entity, now));
+      }
+    })().catch((error) => {
+      this.#entityLoad = null;
+      throw error;
+    });
+    return this.#entityLoad;
+  }
+
+  async #pagedList(pathname) {
+    const all = [];
+    for (let page = 1; ; page += 1) {
+      const { data, headers } = await this.#request('GET', `${pathname}?page=${page}&limit=${PAGE_SIZE}`);
+      const batch = Array.isArray(data) ? data : [];
+      all.push(...batch);
+      const total = Number(headers.get('pagination-count'));
+      if (batch.length < PAGE_SIZE || (Number.isFinite(total) && total > 0 && all.length >= total)) return all;
+    }
+  }
+
   #browsable(entityId) {
     const watched = this.#watched.get(entityId);
     if (!watched || watched.entity_type !== 'media_player') throw new HttpError(404, 'That player is not on a page that is open.');
@@ -572,19 +853,44 @@ export class Remote extends EventEmitter {
     await this.#request('PUT', `/api/entities/${encodeURIComponent(entityId)}/command`, body);
   }
 
-  async #ui(activityId) {
-    this.#requireActivity(activityId);
-    if (!this.#uis.has(activityId)) {
-      const { data } = await this.#request('GET', `/api/activities/${encodeURIComponent(activityId)}/ui`);
-      this.#uis.set(activityId, toPages(data));
+  async #ui(targetId, kind) {
+    const target = await this.#target(targetId, kind);
+    if (!this.#uis.has(targetId)) {
+      const data = target.entity
+        ? deviceInterface(target.entity)
+        : (await this.#request('GET', `/api/activities/${encodeURIComponent(targetId)}/ui`)).data;
+      this.#uis.set(targetId, toPages(data));
     }
-    return this.#uis.get(activityId);
+    return this.#uis.get(targetId);
+  }
+
+  async #target(targetId, kind) {
+    if (kind !== 'device') return this.#requireActivity(targetId);
+    let watched = this.#watched.get(targetId);
+    if (!watched) {
+      const entity = await this.#entity(targetId);
+      if (entity?.entity_type === 'remote') {
+        watched = toWatched(entity, Date.now());
+        this.#watched.set(targetId, watched);
+      }
+    }
+    if (watched?.entity_type !== 'remote' || !toEntityView(watched).controllable) {
+      throw new HttpError(404, `${this.#label} has no device ${targetId} with buttons or pages.`);
+    }
+    return { name: localizedText(watched.name) ?? targetId, entity: watched };
   }
 
   #forgetActivity(activityId) {
     this.#mappings.delete(activityId);
     this.#uis.delete(activityId);
     this.emit('pages', activityId);
+  }
+
+  #forgetDevice(entityId) {
+    if (!this.#uis.has(entityId) && !this.#mappings.has(entityId)) return;
+    this.#uis.delete(entityId);
+    this.#mappings.delete(entityId);
+    this.emit('pages', entityId);
   }
 
   get #label() {
@@ -597,17 +903,20 @@ export class Remote extends EventEmitter {
     return activity;
   }
 
-  async #mapping(activityId) {
-    this.#requireActivity(activityId);
-    if (!this.#mappings.has(activityId)) {
-      const { data } = await this.#request('GET', `/api/activities/${encodeURIComponent(activityId)}`);
+  async #mapping(targetId, kind) {
+    const target = await this.#target(targetId, kind);
+    if (this.#mappings.has(targetId)) return this.#mappings.get(targetId);
+    if (target.entity) {
+      this.#mappings.set(targetId, resolveButtons(deviceMapping(target.entity), null));
+    } else {
+      const { data } = await this.#request('GET', `/api/activities/${encodeURIComponent(targetId)}`);
       const buttonMapping = data?.options?.button_mapping ?? [];
       const dpadEntityId = buttonMapping.find((entry) => entry.button.startsWith('DPAD_') && isMapped(entry))?.short_press.entity_id;
       const needsDevice = buttonMapping.some((entry) => !isMapped(entry) && FALLBACKS[entry.button]);
       const dpadDevice = dpadEntityId && needsDevice ? await this.#entity(dpadEntityId) : null;
-      this.#mappings.set(activityId, resolveButtons(buttonMapping, dpadDevice));
+      this.#mappings.set(targetId, resolveButtons(buttonMapping, dpadDevice));
     }
-    return this.#mappings.get(activityId);
+    return this.#mappings.get(targetId);
   }
 
   async #entity(entityId) {
@@ -705,6 +1014,7 @@ export class Remote extends EventEmitter {
     this.#state.activities = activities;
     this.#mappings.clear();
     this.#uis.clear();
+    this.#entityLoad = null;
     this.#state.battery = toBattery(battery.data);
     this.#state.batteryProblem = battery.problem;
     this.#state.powerSupply = power.data?.power_supply ?? battery.data?.power_supply ?? null;
@@ -810,8 +1120,12 @@ export class Remote extends EventEmitter {
     const data = message.msg_data ?? {};
     if (message.msg === 'entity_change' && data.entity_type === 'activity') {
       this.#applyActivityChange(data);
-    } else if (message.msg === 'entity_change' && data.entity_id && WIDGET_ENTITY_TYPES.has(data.entity_type)) {
+    } else if (message.msg === 'entity_change' && data.entity_id && data.entity_type) {
       this.#applyWidgetChange(data);
+    } else if (PROFILE_EVENTS.has(message.msg)) {
+      this.emit('profile');
+    } else if (INTEGRATION_EVENTS.has(message.msg)) {
+      this.emit('integrations');
     } else if (message.msg === 'entity_change' && !data.entity_id && !data.entity_type) {
       this.#reload();
     } else if (message.msg === 'battery_status') {
@@ -847,12 +1161,24 @@ export class Remote extends EventEmitter {
     this.#emitChange();
   }
 
+  async #addListed(entityId) {
+    const entity = await this.#entity(entityId).catch(() => null);
+    if (!entity?.entity_type || entity.entity_type === 'activity' || this.#watched.has(entityId)) return;
+    const watched = toWatched(entity, Date.now());
+    this.#watched.set(entityId, watched);
+    this.emit('entity', this.#view(watched, Date.now()));
+  }
+
   #applyWidgetChange({ event_type: eventType, entity_id: entityId, new_state: newState }) {
     const watched = this.#watched.get(entityId);
-    if (!watched) return;
+    if (!watched) {
+      if (eventType !== 'DELETE' && this.#entityLoad) this.#entityLoad.then(() => this.#addListed(entityId), () => {});
+      return;
+    }
     if (eventType === 'DELETE') {
       this.#watched.delete(entityId);
       this.#images.delete(entityId);
+      this.#forgetDevice(entityId);
       this.emit('entity', { id: entityId, type: watched.entity_type, missing: true });
       return;
     }
@@ -860,7 +1186,11 @@ export class Remote extends EventEmitter {
     const attributes = newState?.attributes ?? {};
     const before = mediaPosition(watched, now);
     if (newState?.name !== undefined) watched.name = newState.name;
-    if (newState?.options !== undefined) watched.options = newState.options;
+    if (Array.isArray(newState?.features)) watched.features = newState.features.filter((feature) => typeof feature === 'string');
+    if (newState?.options !== undefined) {
+      watched.options = newState.options;
+      this.#forgetDevice(entityId);
+    }
     Object.assign(watched.attributes, attributes);
     if (finite(attributes.media_position) !== null) watched.positionAt = now;
     else if (attributes.state !== undefined && before !== null) {

@@ -181,6 +181,20 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
       await remote.systemCommand(command);
       return sendJson(res, 200, { ok: true });
     }
+    if (parts.length === 3 && parts[0] === 'remotes' && method === 'GET' && ['profile', 'entities', 'integrations'].includes(parts[2])) {
+      const remote = findRemote(parts[1]);
+      if (parts[2] === 'profile') return sendJson(res, 200, await remote.profilePages());
+      if (parts[2] === 'entities') return sendJson(res, 200, await remote.entities());
+      return sendJson(res, 200, await remote.integrations());
+    }
+    if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'control') {
+      const remote = findRemote(parts[1]);
+      if (method !== 'POST') throw new HttpError(405, `${method} is not allowed here.`);
+      if (!sameOrigin(req)) throw new HttpError(403, 'Cross-site requests are not allowed.');
+      const { action, value } = await readJsonBody(req);
+      await remote.deviceCommand(parts[3], action, value);
+      return sendJson(res, 200, { ok: true });
+    }
     if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'image' && method === 'GET') {
       return sendImage(res, await findRemote(parts[1]).mediaImage(parts[3]), 'private, max-age=86400');
     }
@@ -204,30 +218,31 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
       await remote.playerCommand(parts[3], action, value);
       return sendJson(res, 200, { ok: true });
     }
-    if (parts[0] === 'remotes' && parts[2] === 'activities' && parts.length >= 5) {
+    if (parts[0] === 'remotes' && (parts[2] === 'activities' || parts[2] === 'devices') && parts.length >= 5) {
       const remote = findRemote(parts[1]);
       const activityId = parts[3];
+      const kind = parts[2] === 'devices' ? 'device' : 'activity';
       if (parts.length === 5 && parts[4] === 'buttons' && method === 'GET') {
-        return sendJson(res, 200, await remote.buttons(activityId));
+        return sendJson(res, 200, await remote.buttons(activityId, kind));
       }
       if (parts.length === 5 && parts[4] === 'pages' && method === 'GET') {
-        return sendJson(res, 200, await remote.pages(activityId));
+        return sendJson(res, 200, await remote.pages(activityId, kind));
       }
       if (method !== 'POST') throw new HttpError(405, `${method} is not allowed here.`);
       if (!sameOrigin(req)) throw new HttpError(403, 'Cross-site requests are not allowed.');
       const body = await readJsonBody(req);
-      if (parts.length === 5 && parts[4] === 'power') {
+      if (parts.length === 5 && parts[4] === 'power' && kind === 'activity') {
         if (typeof body.on !== 'boolean') throw new HttpError(400, 'Send {"on": true} or {"on": false}.');
         await remote.setActivityPower(activityId, body.on);
         return sendJson(res, 200, { ok: true });
       }
       if (parts.length === 6 && parts[4] === 'buttons') {
-        await remote.press(activityId, parts[5]);
+        await remote.press(activityId, parts[5], kind);
         return sendJson(res, 200, { ok: true });
       }
       if (parts.length === 8 && parts[4] === 'pages' && parts[6] === 'items') {
         if (!/^\d{1,4}$/.test(parts[7])) throw new HttpError(400, 'The item number is not valid.');
-        await remote.pressItem(activityId, parts[5], Number(parts[7]));
+        await remote.pressItem(activityId, parts[5], Number(parts[7]), kind);
         return sendJson(res, 200, { ok: true });
       }
     }
@@ -290,6 +305,8 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
     change: (snapshot) => broadcast({ type: 'remote', remote: snapshot }),
     entity: (entity) => broadcast({ type: 'entity', remote: remote.id, entity }),
     pages: (activity) => broadcast({ type: 'pages', remote: remote.id, activity }),
+    profile: () => broadcast({ type: 'profile', remote: remote.id }),
+    integrations: () => broadcast({ type: 'integrations', remote: remote.id }),
   }));
   for (const { remote, ...events } of listeners) {
     for (const [name, listener] of Object.entries(events)) remote.on(name, listener);

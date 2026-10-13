@@ -15,23 +15,28 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="ucweb home">
-      <svg class="logo" id="logo" viewBox="0 0 64 64" aria-hidden="true">
-        <g class="logo-waves">
-          <path class="wave wave-1" d="M28.79 10.17 A5 5 0 0 1 35.21 10.17"/>
-          <path class="wave wave-2" d="M26.21 7.11 A9 9 0 0 1 37.79 7.11"/>
-          <path class="wave wave-3" d="M23.64 4.04 A13 13 0 0 1 40.36 4.04"/>
-        </g>
-        <rect class="logo-body" x="20" y="15" width="24" height="45" rx="10"/>
-        <circle class="logo-ring" cx="32" cy="31" r="7"/>
-        <circle class="logo-sweep" cx="32" cy="31" r="7" pathLength="100"/>
-        <circle class="logo-core" cx="32" cy="31" r="2.6"/>
-        <circle class="logo-key" cx="27.5" cy="45" r="1.6"/>
-        <circle class="logo-key" cx="36.5" cy="45" r="1.6"/>
-        <line class="logo-key-line" x1="28" y1="52" x2="36" y2="52"/>
-      </svg>
-      <span class="wordmark">uc<span class="wordmark-accent">web</span></span>
-    </a>
+    <div class="topbar-start">
+      <button class="menu-button" id="menu-button" type="button" aria-label="Open the menu" aria-controls="nav" aria-expanded="false" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+      </button>
+      <a class="brand" href="/" aria-label="ucweb home">
+        <svg class="logo" id="logo" viewBox="0 0 64 64" aria-hidden="true">
+          <g class="logo-waves">
+            <path class="wave wave-1" d="M28.79 10.17 A5 5 0 0 1 35.21 10.17"/>
+            <path class="wave wave-2" d="M26.21 7.11 A9 9 0 0 1 37.79 7.11"/>
+            <path class="wave wave-3" d="M23.64 4.04 A13 13 0 0 1 40.36 4.04"/>
+          </g>
+          <rect class="logo-body" x="20" y="15" width="24" height="45" rx="10"/>
+          <circle class="logo-ring" cx="32" cy="31" r="7"/>
+          <circle class="logo-sweep" cx="32" cy="31" r="7" pathLength="100"/>
+          <circle class="logo-core" cx="32" cy="31" r="2.6"/>
+          <circle class="logo-key" cx="27.5" cy="45" r="1.6"/>
+          <circle class="logo-key" cx="36.5" cy="45" r="1.6"/>
+          <line class="logo-key-line" x1="28" y1="52" x2="36" y2="52"/>
+        </svg>
+        <span class="wordmark">uc<span class="wordmark-accent">web</span></span>
+      </a>
+    </div>
     <nav class="remote-tabs" id="remote-tabs" aria-label="Remotes"></nav>
     <div class="topbar-tools">
       <label class="theme-picker">
@@ -76,163 +81,209 @@
 
   <div class="banner" id="banner" hidden></div>
 
-  <main class="page" id="app" hidden>
-    <section class="section status-section" aria-labelledby="status-title">
-      <header class="section-head">
-        <h2 class="section-title" id="status-title">Status</h2>
-        <span class="section-meta" id="status-meta"></span>
-      </header>
-      <div class="status" id="status" aria-live="polite"></div>
-    </section>
+  <div class="shell" id="shell" hidden>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <div class="nav-head">
+        <span class="nav-remote" id="nav-remote"></span>
+        <button class="nav-close" id="nav-close" type="button" aria-label="Close the menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <p class="nav-label" id="nav-pages-label">Pages</p>
+      <ul class="nav-list" id="nav-pages" aria-labelledby="nav-pages-label"></ul>
+      <p class="nav-label" id="nav-browse-label">Browse</p>
+      <ul class="nav-list" aria-labelledby="nav-browse-label">
+        <li>
+          <button class="nav-item" type="button" data-screen="entities">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83zM22 17.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+            <span class="nav-text">Entities</span>
+            <span class="nav-count" id="nav-entities-count"></span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" type="button" data-screen="integrations">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.39 4.39a1 1 0 0 0 1.68-.47 2.5 2.5 0 1 1 3.01 3.01 1 1 0 0 0-.47 1.68l1.68 1.68a2.41 2.41 0 0 1 0 3.42l-1.68 1.68a1 1 0 0 1-1.68-.47 2.5 2.5 0 1 0-3.01 3.01 1 1 0 0 1 .47 1.68l-1.68 1.68a2.41 2.41 0 0 1-3.42 0l-1.68-1.68a1 1 0 0 0-1.68.47 2.5 2.5 0 1 1-3.01-3.01 1 1 0 0 0 .47-1.68l-1.68-1.68a2.41 2.41 0 0 1 0-3.42l1.68-1.68a1 1 0 0 1 1.68.47 2.5 2.5 0 1 0 3.01-3.01 1 1 0 0 1-.47-1.68l1.68-1.68a2.41 2.41 0 0 1 3.42 0z"/></svg>
+            <span class="nav-text">Integrations</span>
+            <span class="nav-count" id="nav-integrations-count"></span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+    <div class="nav-scrim" id="nav-scrim" hidden></div>
 
-    <div class="layout">
-      <section class="section activities" aria-labelledby="activities-title">
+    <main class="page" id="app">
+      <section class="section status-section" aria-labelledby="status-title">
         <header class="section-head">
-          <h2 class="section-title" id="activities-title">Activities</h2>
-          <span class="section-meta" id="activities-meta"></span>
+          <h2 class="section-title" id="status-title">Status</h2>
+          <span class="section-meta" id="status-meta"></span>
         </header>
-        <div class="activity-grid" id="activity-grid"></div>
+        <div class="status" id="status" aria-live="polite"></div>
       </section>
 
-      <section class="section control" id="control" aria-labelledby="control-title">
-        <header class="section-head">
-          <h2 class="section-title" id="control-title">Control</h2>
-          <span class="section-meta" id="control-meta"></span>
-        </header>
-        <div class="control-panel">
-          <div class="control-head" id="control-head"></div>
+      <div class="layout">
+        <section class="section activities" aria-labelledby="activities-title">
+          <header class="section-head">
+            <h2 class="section-title" id="activities-title">Activities</h2>
+            <span class="section-meta" id="activities-meta"></span>
+          </header>
+          <div class="activity-grid" id="activity-grid"></div>
+        </section>
 
-          <div class="view-switch" id="view-switch" role="tablist" aria-label="Show" hidden>
-            <button type="button" role="tab" data-view="pages" aria-controls="pages">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM3 9h18M9 21V9"/></svg>
-              <span>Pages</span>
-            </button>
-            <button type="button" role="tab" data-view="controls" aria-controls="pad">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 4.5v2M12 17.5v2M4.5 12h2M17.5 12h2"/></svg>
-              <span>Controls</span>
-            </button>
-          </div>
+        <section class="section control" id="control" aria-labelledby="control-title">
+          <header class="section-head">
+            <h2 class="section-title" id="control-title">Control</h2>
+            <span class="section-meta" id="control-meta"></span>
+          </header>
+          <div class="control-panel">
+            <div class="control-head" id="control-head"></div>
 
-          <div class="pages" id="pages" role="tabpanel" hidden></div>
-
-          <div class="pad" id="pad" role="tabpanel" hidden>
-            <div class="pad-row pad-top">
-              <button class="key" data-button="BACK" aria-label="Back">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
+            <div class="view-switch" id="view-switch" role="tablist" aria-label="Show" hidden>
+              <button type="button" role="tab" data-view="pages" aria-controls="pages">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM3 9h18M9 21V9"/></svg>
+                <span>Pages</span>
               </button>
-              <button class="key" data-button="HOME" aria-label="Home">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>
-              </button>
-              <button class="key" data-button="MENU" aria-label="Menu">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
+              <button type="button" role="tab" data-view="controls" aria-controls="pad">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 4.5v2M12 17.5v2M4.5 12h2M17.5 12h2"/></svg>
+                <span>Controls</span>
               </button>
             </div>
 
-            <div class="dpad">
-              <button class="dpad-key dpad-up" data-button="DPAD_UP" data-repeat aria-label="Up">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
-              </button>
-              <button class="dpad-key dpad-left" data-button="DPAD_LEFT" data-repeat aria-label="Left">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-              </button>
-              <button class="dpad-ok" data-button="DPAD_MIDDLE" aria-label="OK">OK</button>
-              <button class="dpad-key dpad-right" data-button="DPAD_RIGHT" data-repeat aria-label="Right">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-              </button>
-              <button class="dpad-key dpad-down" data-button="DPAD_DOWN" data-repeat aria-label="Down">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-              </button>
-            </div>
+            <div class="pages" id="pages" role="tabpanel" hidden></div>
 
-            <div class="pad-row rockers">
-              <div class="rocker" role="group" aria-label="Volume">
-                <button class="key" data-button="VOLUME_UP" data-repeat aria-label="Volume up">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
+            <div class="pad" id="pad" role="tabpanel" hidden>
+              <div class="pad-row pad-top">
+                <button class="key" data-button="BACK" aria-label="Back">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
                 </button>
-                <span class="rocker-label">Vol</span>
-                <button class="key" data-button="VOLUME_DOWN" data-repeat aria-label="Volume down">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>
+                <button class="key" data-button="HOME" aria-label="Home">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>
+                </button>
+                <button class="key" data-button="MENU" aria-label="Menu">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>
                 </button>
               </div>
-              <button class="key key-round" data-button="MUTE" aria-label="Mute">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg>
-              </button>
-              <div class="rocker" role="group" aria-label="Channel">
-                <button class="key" data-button="CHANNEL_UP" data-repeat aria-label="Channel up">
+
+              <div class="dpad">
+                <button class="dpad-key dpad-up" data-button="DPAD_UP" data-repeat aria-label="Up">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
                 </button>
-                <span class="rocker-label">Ch</span>
-                <button class="key" data-button="CHANNEL_DOWN" data-repeat aria-label="Channel down">
+                <button class="dpad-key dpad-left" data-button="DPAD_LEFT" data-repeat aria-label="Left">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+                </button>
+                <button class="dpad-ok" data-button="DPAD_MIDDLE" aria-label="OK">OK</button>
+                <button class="dpad-key dpad-right" data-button="DPAD_RIGHT" data-repeat aria-label="Right">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+                </button>
+                <button class="dpad-key dpad-down" data-button="DPAD_DOWN" data-repeat aria-label="Down">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
               </div>
-            </div>
 
-            <div class="pad-row transport">
-              <button class="key" data-button="PREV" aria-label="Previous">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>
-              </button>
-              <button class="key" data-button="STOP" aria-label="Stop">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>
-              </button>
-              <button class="key key-primary" data-button="PLAY" aria-label="Play or pause">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l9-7zM16 6v12M20 6v12"/></svg>
-              </button>
-              <button class="key" data-button="RECORD" aria-label="Record">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg>
-              </button>
-              <button class="key" data-button="NEXT" aria-label="Next">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>
-              </button>
+              <div class="pad-row rockers">
+                <div class="rocker" role="group" aria-label="Volume">
+                  <button class="key" data-button="VOLUME_UP" data-repeat aria-label="Volume up">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
+                  </button>
+                  <span class="rocker-label">Vol</span>
+                  <button class="key" data-button="VOLUME_DOWN" data-repeat aria-label="Volume down">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>
+                  </button>
+                </div>
+                <button class="key key-round" data-button="MUTE" aria-label="Mute">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg>
+                </button>
+                <div class="rocker" role="group" aria-label="Channel">
+                  <button class="key" data-button="CHANNEL_UP" data-repeat aria-label="Channel up">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+                  </button>
+                  <span class="rocker-label">Ch</span>
+                  <button class="key" data-button="CHANNEL_DOWN" data-repeat aria-label="Channel down">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="pad-row transport">
+                <button class="key" data-button="PREV" aria-label="Previous">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M19 5 9 12l10 7z"/></svg>
+                </button>
+                <button class="key" data-button="STOP" aria-label="Stop">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h10v10H7z"/></svg>
+                </button>
+                <button class="key key-primary" data-button="PLAY" aria-label="Play or pause">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l9-7zM16 6v12M20 6v12"/></svg>
+                </button>
+                <button class="key" data-button="RECORD" aria-label="Record">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/></svg>
+                </button>
+                <button class="key" data-button="NEXT" aria-label="Next">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>
+                </button>
+              </div>
             </div>
+            <p class="hint" id="hint" hidden>Keyboard: arrows, Enter, Backspace, + and -, M, Space. [ and ] change page, 0 goes to the first page, T switches pages and controls.</p>
           </div>
-          <p class="hint" id="hint" hidden>Keyboard: arrows, Enter, Backspace, + and -, M, Space. [ and ] change page, 0 goes to the first page, T switches pages and controls.</p>
+        </section>
+      </div>
+
+      <section class="section system" aria-labelledby="system-title">
+        <header class="section-head">
+          <h2 class="section-title" id="system-title">Remote</h2>
+          <span class="section-meta" id="system-meta"></span>
+        </header>
+        <div class="system-panel">
+          <div class="system-row">
+            <svg class="system-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4v6M8 14v6"/></svg>
+            <div class="system-text">
+              <h3 class="system-name">Web configurator</h3>
+              <p class="system-description">Open the remote's own settings page in a new tab: activities, devices, integrations.</p>
+            </div>
+            <a class="system-button" id="system-configurator" target="_blank" rel="noopener noreferrer">
+              <span class="system-button-text">Open</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+            </a>
+          </div>
+          <div class="system-row">
+            <svg class="system-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M7.05 6.05a7 7 0 1 0 9.9 0"/></svg>
+            <div class="system-text">
+              <h3 class="system-name">Reboot remote</h3>
+              <p class="system-description">Restart the operating system. The remote will briefly go offline.</p>
+            </div>
+            <button class="system-button" id="system-reboot" type="button" data-command="REBOOT">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+              <span class="system-button-text">Reboot</span>
+            </button>
+          </div>
+          <div class="system-row is-danger">
+            <svg class="system-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M7.05 6.05a7 7 0 1 0 9.9 0"/></svg>
+            <div class="system-text">
+              <h3 class="system-name">Power off remote</h3>
+              <p class="system-description">Shut the remote down completely. You will need to power it back on physically.</p>
+            </div>
+            <button class="system-button" id="system-power-off" type="button" data-command="POWER_OFF">
+              <span class="system-button-text">Power off</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            </button>
+          </div>
         </div>
       </section>
-    </div>
 
-    <section class="section system" aria-labelledby="system-title">
-      <header class="section-head">
-        <h2 class="section-title" id="system-title">Remote</h2>
-        <span class="section-meta" id="system-meta"></span>
-      </header>
-      <div class="system-panel">
-        <div class="system-row">
-          <svg class="system-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4v6M8 14v6"/></svg>
-          <div class="system-text">
-            <h3 class="system-name">Web configurator</h3>
-            <p class="system-description">Open the remote's own settings page in a new tab: activities, devices, integrations.</p>
-          </div>
-          <a class="system-button" id="system-configurator" target="_blank" rel="noopener noreferrer">
-            <span class="system-button-text">Open</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
-          </a>
+      <section class="section browse" id="browse" aria-labelledby="browse-title" hidden>
+        <header class="section-head">
+          <h2 class="section-title" id="browse-title">Entities</h2>
+          <span class="section-meta" id="browse-meta"></span>
+        </header>
+        <div class="browse-tools" id="browse-tools">
+          <label class="browse-search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM21 21l-4.3-4.3"/></svg>
+            <input id="browse-search" type="search" placeholder="Search entities" aria-label="Search entities" autocomplete="off" spellcheck="false">
+          </label>
+          <div class="browse-filters" id="browse-filters" role="group" aria-label="Show"></div>
         </div>
-        <div class="system-row">
-          <svg class="system-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M7.05 6.05a7 7 0 1 0 9.9 0"/></svg>
-          <div class="system-text">
-            <h3 class="system-name">Reboot remote</h3>
-            <p class="system-description">Restart the operating system. The remote will briefly go offline.</p>
-          </div>
-          <button class="system-button" id="system-reboot" type="button" data-command="REBOOT">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
-            <span class="system-button-text">Reboot</span>
-          </button>
-        </div>
-        <div class="system-row is-danger">
-          <svg class="system-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v8M7.05 6.05a7 7 0 1 0 9.9 0"/></svg>
-          <div class="system-text">
-            <h3 class="system-name">Power off remote</h3>
-            <p class="system-description">Shut the remote down completely. You will need to power it back on physically.</p>
-          </div>
-          <button class="system-button" id="system-power-off" type="button" data-command="POWER_OFF">
-            <span class="system-button-text">Power off</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-          </button>
-        </div>
-      </div>
-    </section>
-  </main>
+        <div class="browse-body" id="browse-body"></div>
+      </section>
+    </main>
+  </div>
 
   <dialog class="player" id="player" aria-label="Player"></dialog>
   <dialog class="browser" id="browser" aria-label="Library"></dialog>
