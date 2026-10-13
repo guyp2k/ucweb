@@ -107,3 +107,14 @@ test('the README and the Unraid template list every theme', async () => {
     assert.match(templateTheme, new RegExp(`[ "]${id}[,. ]`), `Unraid template lists ${id}`);
   }
 });
+
+test('the logo goes back to its idle animation after the send pulse', async () => {
+  const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
+  const animation = (selector) => css.match(new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{[^}]*?animation: ([^;]+);`))?.[1];
+  for (const [part, idle] of [['.wave-1', 'logo-wave'], ['.wave-2', 'logo-wave'], ['.wave-3', 'logo-wave'], ['.logo-core', 'logo-core']]) {
+    const sending = animation(`.logo.is-sending ${part}`);
+    assert.ok(sending, `${part} has a sending animation`);
+    assert.match(sending, /^logo-(send|press) /, `${part} plays the pulse first`);
+    assert.match(sending, new RegExp(`, ${idle} [^,]* infinite$`), `${part} resumes ${idle} forever after the pulse`);
+  }
+});
