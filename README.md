@@ -19,8 +19,11 @@ every remote's status live.
   does (the input it selects, the app it opens, the command it sends), so a page looks the same in every theme.
   Apps are shown by name, never by logo. The last page you looked at is remembered for each activity.
 - **Media widgets** carry their own controls like the remote app: previous, play and pause, next, shuffle, repeat and
-  a source picker, each shown only when the player supports it. Library browsing is tracked in
-  [#19](https://github.com/guyp2k/ucweb/issues/19).
+  a source picker, each shown only when the player supports it.
+- **Library**: the library button on a media widget (or in the full player) browses the player's own library, such as
+  Spotify playlists or Roon's Library, Radio and TIDAL, with artwork and paging. Tap a folder to open it, tap play to
+  play it, and use the menu for Play next or Add to queue when the player offers them. ucweb only plays items the
+  player just listed.
 - **Player**: tap a media widget's artwork for the full player: large artwork, title, artist and album, a seek bar, play and
   pause, previous, next, stop, shuffle, repeat, volume and source. It offers only the controls that player reports it
   supports, and the server checks every command against that list before sending it.

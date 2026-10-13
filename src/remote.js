@@ -25,8 +25,22 @@ const PLAYER_ACTIONS = {
   shuffle: { feature: 'shuffle', param: 'shuffle' },
   repeat: { feature: 'repeat', param: 'repeat' },
   select_source: { feature: 'select_source', param: 'source' },
+  play_media: { feature: 'play_media', param: 'media_id' },
 };
-const PLAYER_FEATURES = [...new Set(Object.values(PLAYER_ACTIONS).map((action) => action.feature))];
+const PLAYER_FEATURES = [...new Set(Object.values(PLAYER_ACTIONS).map((action) => action.feature)), 'browse_media'];
+const BROWSE_PAGE = 30;
+const MAX_MEDIA_ID = 255;
+const MAX_REMEMBERED = 2000;
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+const JPEG_MAGIC = Buffer.from([0xff, 0xd8, 0xff]);
+
+const mediaKey = (mediaId, mediaType) => `${mediaId}\u0000${mediaType ?? '\u0001'}`;
+
+function remember(map, key, value) {
+  map.delete(key);
+  map.set(key, value);
+  if (map.size > MAX_REMEMBERED) map.delete(map.keys().next().value);
+}
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -183,6 +197,9 @@ export function toEntityView(watched, now = Date.now()) {
       repeat: REPEAT_MODES.has(attributes.repeat) ? attributes.repeat : null,
       source: typeof attributes.source === 'string' && attributes.source ? attributes.source : null,
       sources: (watched.features ?? []).includes('select_source') ? sourceList(attributes) : [],
+      playActions: (watched.features ?? []).includes('play_media_action') && Array.isArray(attributes.play_media_action)
+        ? attributes.play_media_action.filter((how) => typeof how === 'string')
+        : [],
     });
   } else if (watched.entity_type === 'sensor') {
     const unit = attributes.unit ?? watched.options?.custom_unit;
@@ -250,6 +267,7 @@ export class Remote extends EventEmitter {
   #uis = new Map();
   #watched = new Map();
   #images = new Map();
+  #browseMemory = new Map();
   #state;
 
   constructor({
@@ -367,27 +385,7 @@ export class Remote extends EventEmitter {
     if (typeof url !== 'string' || !url) throw new HttpError(404, 'Nothing is showing on that player.');
     const cached = this.#images.get(entityId);
     if (cached?.url === url) return cached;
-    let image;
-    const inline = url.match(/^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=\s]+)$/i);
-    if (inline) {
-      const type = imageType(inline[1]);
-      if (!type) throw new HttpError(502, 'The player\'s artwork is in a format ucweb does not show.');
-      image = { url, type, body: Buffer.from(inline[2], 'base64') };
-    } else {
-      let parsed;
-      try {
-        parsed = new URL(url);
-      } catch {
-        throw new HttpError(502, 'The player\'s artwork address is not valid.');
-      }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new HttpError(502, 'The player\'s artwork address is not a web address.');
-      const response = await this.#fetchArtwork(parsed.href);
-      if (!response.ok) throw new HttpError(502, `The player's artwork answered HTTP ${response.status}.`);
-      const type = imageType(response.headers.get('content-type'));
-      if (!type) throw new HttpError(502, 'The player\'s artwork is in a format ucweb does not show.');
-      image = { url, type, body: await readCapped(response, MAX_IMAGE_BYTES) };
-    }
-    if (image.body.length > MAX_IMAGE_BYTES) throw new HttpError(502, 'The image is too large.');
+    const image = { url, ...(await this.#loadImage(url)) };
     this.#images.set(entityId, image);
     return image;
   }
@@ -415,6 +413,18 @@ export class Remote extends EventEmitter {
     } else if (action === 'repeat') {
       if (!REPEAT_MODES.has(value)) throw new HttpError(400, 'Send repeat as OFF, ALL or ONE.');
       params = { repeat: value };
+    } else if (action === 'play_media') {
+      const { mediaId, mediaType, action: how } = value ?? {};
+      const known = typeof mediaId === 'string' && (mediaType === null || typeof mediaType === 'string')
+        && this.#browseMemory.get(entityId)?.playable.has(mediaKey(mediaId, mediaType));
+      if (!known) throw new HttpError(400, 'Play something from the player\'s own library list.');
+      const actions = Array.isArray(watched.attributes.play_media_action) ? watched.attributes.play_media_action : [];
+      if (how !== undefined && !(watched.features.includes('play_media_action') && actions.includes(how))) {
+        throw new HttpError(400, `${name} cannot ${String(how).toLowerCase().replace(/_/g, ' ')}.`);
+      }
+      params = { media_id: mediaId };
+      if (mediaType !== null) params.media_type = mediaType;
+      if (how !== undefined) params.action = how;
     } else if (action === 'select_source') {
       if (typeof value !== 'string' || !sourceList(watched.attributes).includes(value)) {
         throw new HttpError(400, `${name} has no source called ${JSON.stringify(value)}.`);
@@ -422,6 +432,110 @@ export class Remote extends EventEmitter {
       params = { source: value };
     }
     await this.#command({ entityId, cmdId: `media_player.${action}`, params });
+  }
+
+  async #loadImage(url) {
+    const inline = url.match(/^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (inline) {
+      const type = imageType(inline[1]);
+      if (!type) throw new HttpError(502, 'The artwork is in a format ucweb does not show.');
+      const body = Buffer.from(inline[2], 'base64');
+      if (body.length > MAX_IMAGE_BYTES) throw new HttpError(502, 'The image is too large.');
+      return { type, body };
+    }
+    if (/^[A-Za-z0-9+/=\s]{64,}$/.test(url)) {
+      const body = Buffer.from(url, 'base64');
+      const type = body.subarray(0, 4).equals(PNG_MAGIC) ? 'image/png' : body.subarray(0, 3).equals(JPEG_MAGIC) ? 'image/jpeg' : null;
+      if (!type) throw new HttpError(502, 'The artwork is in a format ucweb does not show.');
+      if (body.length > MAX_IMAGE_BYTES) throw new HttpError(502, 'The image is too large.');
+      return { type, body };
+    }
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new HttpError(502, 'The artwork address is not valid.');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new HttpError(502, 'The artwork address is not a web address.');
+    const response = await this.#fetchArtwork(parsed.href);
+    if (!response.ok) throw new HttpError(502, `The artwork answered HTTP ${response.status}.`);
+    const type = imageType(response.headers.get('content-type'));
+    if (!type) throw new HttpError(502, 'The artwork is in a format ucweb does not show.');
+    return { type, body: await readCapped(response, MAX_IMAGE_BYTES) };
+  }
+
+  async browse(entityId, { mediaId, mediaType, page = 1 } = {}) {
+    const watched = this.#browsable(entityId);
+    for (const value of [mediaId, mediaType]) {
+      if (value !== undefined && value !== null && (typeof value !== 'string' || value.length > MAX_MEDIA_ID)) throw new HttpError(400, 'That is not a media location.');
+    }
+    if (!Number.isInteger(page) || page < 1 || page > 1000) throw new HttpError(400, 'Send a page from 1 to 1000.');
+    const query = new URLSearchParams();
+    if (typeof mediaId === 'string') query.set('media_id', mediaId);
+    if (typeof mediaType === 'string') query.set('media_type', mediaType);
+    query.set('page', String(page));
+    query.set('limit', String(BROWSE_PAGE));
+    const { data, headers } = await this.#request('GET', `/api/entities/${encodeURIComponent(entityId)}/media/browse?${query}`);
+    const memory = this.#memory(entityId);
+    const media = data?.media ?? {};
+    const items = (Array.isArray(media.items) ? media.items : []).map((item) => this.#toBrowseItem(item, memory)).filter(Boolean);
+    const total = Number(headers.get('pagination-count'));
+    return {
+      ...this.#toBrowseItem({ ...media, items: undefined }, memory),
+      player: localizedText(watched.name) ?? entityId,
+      items,
+      page,
+      total: Number.isFinite(total) && total >= 0 ? total : null,
+      more: items.length > 0 && (Number.isFinite(total) ? page * BROWSE_PAGE < total : items.length === BROWSE_PAGE),
+    };
+  }
+
+  async thumbnail(entityId, key) {
+    const url = this.#browseMemory.get(entityId)?.thumbs.get(key);
+    if (!url) throw new HttpError(404, 'That picture is not from a list that is open.');
+    return this.#loadImage(url);
+  }
+
+  #browsable(entityId) {
+    const watched = this.#watched.get(entityId);
+    if (!watched || watched.entity_type !== 'media_player') throw new HttpError(404, 'That player is not on a page that is open.');
+    if (!watched.features.includes('browse_media')) throw new HttpError(409, `${localizedText(watched.name) ?? entityId} cannot browse its media.`);
+    return watched;
+  }
+
+  #memory(entityId) {
+    if (!this.#browseMemory.has(entityId)) this.#browseMemory.set(entityId, { playable: new Map(), thumbs: new Map() });
+    return this.#browseMemory.get(entityId);
+  }
+
+  #toBrowseItem(item, memory) {
+    if (!item || typeof item !== 'object') return null;
+    const text = (value) => (typeof value === 'string' && value ? value : null);
+    const mediaId = typeof item.media_id === 'string' ? item.media_id : null;
+    const mediaType = typeof item.media_type === 'string' ? item.media_type : null;
+    const canPlay = item.can_play === true && mediaId !== null;
+    if (canPlay) remember(memory.playable, mediaKey(mediaId, mediaType), true);
+    const thumbnail = text(item.thumbnail);
+    let thumb = null;
+    let icon = null;
+    if (thumbnail?.startsWith('icon://')) {
+      icon = thumbnail.slice('icon://'.length);
+    } else if (thumbnail) {
+      thumb = createHash('sha256').update(thumbnail).digest('hex').slice(0, 20);
+      remember(memory.thumbs, thumb, thumbnail);
+    }
+    return {
+      title: text(item.title) ?? mediaId ?? 'Untitled',
+      subtitle: text(item.subtitle) ?? ([text(item.artist), text(item.album)].filter(Boolean).join(' · ') || null),
+      mediaId,
+      mediaType,
+      mediaClass: text(item.media_class),
+      canBrowse: item.can_browse === true,
+      canPlay,
+      duration: Number.isInteger(item.duration) && item.duration > 0 ? item.duration : null,
+      thumb,
+      icon,
+    };
   }
 
   async #command({ entityId, cmdId, params }) {

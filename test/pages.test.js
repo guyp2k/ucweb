@@ -374,3 +374,111 @@ test('a player that cannot select a source reports no sources and refuses one', 
   assert.deepEqual(states['media.dmp'].sources, []);
   await assert.rejects(remote.playerCommand('media.dmp', 'select_source', 'USB-B In'), { status: 409 });
 });
+
+const library = {
+  '-|-': {
+    total: 2,
+    media: {
+      title: 'Explore', media_id: 'Explore', media_class: 'directory', can_browse: true, thumbnail: 'icon://uc:folder',
+      items: [
+        { title: 'Playlists', media_id: 'lists', media_type: '', media_class: 'playlist', can_browse: true, thumbnail: 'icon://uc:list-music' },
+        { title: 'Kind of Blue', media_id: 'album:1', media_type: 'album', media_class: 'album', artist: 'Miles Davis', can_browse: true, can_play: true, thumbnail: 'http://art.example/kob.jpg' },
+      ],
+    },
+  },
+  'lists|': {
+    total: 31,
+    media: {
+      title: 'Playlists', media_id: 'lists', media_type: '', can_browse: true,
+      items: [{ title: 'Late Night', media_id: 'pl:9', can_play: true, subtitle: 'by pat', thumbnail: Buffer.from('89504e470d0a1a0a0000', 'hex').toString('base64').padEnd(64, 'A') }],
+    },
+  },
+};
+
+async function connectBrowsing(features = ['play_pause', 'browse_media', 'play_media'], attributes = {}) {
+  const players = structuredClone(entities);
+  players['media.dmp'].features = features;
+  Object.assign(players['media.dmp'].attributes, attributes);
+  await connect({ entities: players, browse: structuredClone(library) });
+  await remote.pages('act.tv');
+}
+
+test('browsing lists a player\'s items and keeps their ids exactly as the player sent them', async () => {
+  await connectBrowsing();
+  const root = await remote.browse('media.dmp');
+  assert.deepEqual(fake.state.browseRequests[0], { entityId: 'media.dmp', page: '1', limit: '30' });
+  assert.equal(root.title, 'Explore');
+  assert.equal(root.player, 'ES-DMP-A10');
+  assert.equal(root.icon, 'uc:folder');
+  assert.equal(root.mediaType, null);
+  assert.deepEqual(root.items.map((item) => [item.title, item.mediaId, item.mediaType, item.canBrowse, item.canPlay]), [
+    ['Playlists', 'lists', '', true, false],
+    ['Kind of Blue', 'album:1', 'album', true, true],
+  ]);
+  assert.equal(root.items[1].subtitle, 'Miles Davis');
+  assert.match(root.items[1].thumb, /^[0-9a-f]{20}$/);
+  assert.ok(!JSON.stringify(root).includes('art.example'));
+  assert.equal(root.more, false);
+  const lists = await remote.browse('media.dmp', { mediaId: 'lists', mediaType: '' });
+  assert.deepEqual(fake.state.browseRequests[1], { entityId: 'media.dmp', media_id: 'lists', media_type: '', page: '1', limit: '30' });
+  assert.equal(lists.total, 31);
+  assert.equal(lists.more, true);
+});
+
+test('only players on an open page that can browse are browsed, and media locations are checked', async () => {
+  await connectBrowsing(['play_pause']);
+  await assert.rejects(remote.browse('media.dmp'), { status: 409 });
+  await assert.rejects(remote.browse('sensor.volume'), { status: 404 });
+  remote.stop();
+  await fake.close();
+  await connectBrowsing();
+  for (const query of [{ mediaId: 5 }, { mediaType: {} }, { mediaId: 'x'.repeat(256) }, { page: 0 }, { page: 1001 }, { page: 1.5 }]) {
+    await assert.rejects(remote.browse('media.dmp', query), { status: 400 }, JSON.stringify(query));
+  }
+  assert.equal(fake.state.browseRequests.length, 0);
+});
+
+test('only an item the player listed can be played, with only the play actions it reports', async () => {
+  await connectBrowsing(['browse_media', 'play_media', 'play_media_action'], { play_media_action: ['PLAY_NOW', 'ADD_TO_QUEUE'] });
+  await assert.rejects(remote.playerCommand('media.dmp', 'play_media', { mediaId: 'album:1', mediaType: 'album' }), { status: 400 });
+  await remote.browse('media.dmp');
+  await remote.browse('media.dmp', { mediaId: 'lists', mediaType: '' });
+  for (const value of [{ mediaId: 'album:2', mediaType: 'album' }, { mediaId: 'album:1', mediaType: 'track' }, { mediaId: 'lists', mediaType: '' }, { mediaId: 'album:1', mediaType: 'album', action: 'PLAY_NEXT' }, undefined]) {
+    await assert.rejects(remote.playerCommand('media.dmp', 'play_media', value), { status: 400 }, JSON.stringify(value));
+  }
+  await remote.playerCommand('media.dmp', 'play_media', { mediaId: 'album:1', mediaType: 'album' });
+  await remote.playerCommand('media.dmp', 'play_media', { mediaId: 'pl:9', mediaType: null, action: 'ADD_TO_QUEUE' });
+  assert.deepEqual(fake.state.commands.map((command) => command.body), [
+    { cmd_id: 'media_player.play_media', params: { media_id: 'album:1', media_type: 'album' } },
+    { cmd_id: 'media_player.play_media', params: { media_id: 'pl:9', action: 'ADD_TO_QUEUE' } },
+  ]);
+});
+
+test('a play action is refused when the player does not report play actions', async () => {
+  await connectBrowsing(['browse_media', 'play_media'], { play_media_action: ['PLAY_NOW'] });
+  await remote.browse('media.dmp');
+  await assert.rejects(remote.playerCommand('media.dmp', 'play_media', { mediaId: 'album:1', mediaType: 'album', action: 'PLAY_NOW' }), { status: 400 });
+  const { entities: states } = await remote.pages('act.tv');
+  assert.deepEqual(states['media.dmp'].playActions, []);
+});
+
+test('pictures are served only for thumbnails from a list that was browsed', async () => {
+  await connectBrowsing();
+  await assert.rejects(remote.thumbnail('media.dmp', '0'.repeat(20)), { status: 404 });
+  const lists = await remote.browse('media.dmp', { mediaId: 'lists', mediaType: '' });
+  const picture = await remote.thumbnail('media.dmp', lists.items[0].thumb);
+  assert.equal(picture.type, 'image/png');
+  assert.deepEqual(picture.body.subarray(0, 4), Buffer.from('89504e47', 'hex'));
+  await assert.rejects(remote.thumbnail('sensor.volume', lists.items[0].thumb), { status: 404 });
+});
+
+test('a list that reports items but sends none never asks for more', async () => {
+  const players = structuredClone(entities);
+  players['media.dmp'].features = ['browse_media'];
+  await connect({ entities: players, browse: { 'pl|playlist': { total: 455, media: { title: 'The Black List', media_id: 'pl', media_type: 'playlist', items: [] } } } });
+  await remote.pages('act.tv');
+  const list = await remote.browse('media.dmp', { mediaId: 'pl', mediaType: 'playlist' });
+  assert.equal(list.total, 455);
+  assert.deepEqual(list.items, []);
+  assert.equal(list.more, false);
+});

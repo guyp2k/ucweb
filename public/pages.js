@@ -203,6 +203,7 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
       if (entity.repeat === 'ONE') repeat.append(el('span', 'media-repeat-one', '1'));
       extras.append(repeat);
     }
+    if (supports('browse_media')) extras.append(mediaControl(entity, 'browse_media', 'Browse the library', 'library', ' media-mode'));
     if (supports('select_source') && entity.sources?.length > 0) {
       const source = mediaControl(entity, 'select_source', entity.source ? `Source: ${entity.source}` : 'Choose a source', 'devices', ' media-mode');
       extras.append(source);
