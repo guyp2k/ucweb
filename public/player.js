@@ -79,6 +79,10 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
   repeat.append(repeatOne);
   const transport = el('div', 'player-transport');
   transport.append(shuffle, previous, playPause, next, stop, repeat);
+  const browseButton = el('button', 'player-source-button');
+  browseButton.type = 'button';
+  browseButton.dataset.action = 'browse_media';
+  browseButton.append(icon('library'), el('span', 'player-source-text', 'Library'));
   const sourceButton = el('button', 'player-source-button');
   sourceButton.type = 'button';
   sourceButton.dataset.action = 'select_source';
@@ -100,7 +104,9 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
 
   const state = el('span', 'player-state');
   const sheet = el('div', 'player-sheet');
-  sheet.append(backdrop, grabber, close, art, state, meta, progress, transport, volume, sourceButton);
+  const pills = el('div', 'player-pills');
+  pills.append(browseButton, sourceButton);
+  sheet.append(backdrop, grabber, close, art, state, meta, progress, transport, volume, pills);
   dialog.replaceChildren(sheet);
 
   const current = { remoteId: null, entity: null, at: 0, imageKey: null, seeking: false, ticker: null, closing: null };
@@ -201,6 +207,8 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
     levelText.hidden = entity.volume === null;
     volume.hidden = mute.hidden && down.hidden && level.hidden;
     sourceButton.hidden = !supports('select_source') || !(entity.sources?.length > 0);
+    browseButton.hidden = !supports('browse_media');
+    pills.hidden = sourceButton.hidden && browseButton.hidden;
     sourceText.textContent = entity.source ? `Source: ${entity.source}` : 'Choose a source';
     paintProgress();
     clearInterval(current.ticker);
@@ -249,6 +257,7 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
   });
   close.addEventListener('click', hide);
   sourceButton.addEventListener('click', () => send('select_source'));
+  browseButton.addEventListener('click', () => send('browse_media'));
   transport.addEventListener('click', (event) => {
     const button = event.target.closest('[data-action]');
     if (!button || !current.entity) return;

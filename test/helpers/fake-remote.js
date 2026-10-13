@@ -24,13 +24,15 @@ export function mapping(entityId) {
   ];
 }
 
-export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {} } = {}) {
+export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {} } = {}) {
   const state = {
     activities,
     buttonMappings,
     entities,
     uis,
     art,
+    browse,
+    browseRequests: [],
     uiRequests: 0,
     artRequests: 0,
     entityRequests: 0,
@@ -64,6 +66,15 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
       return res.end(found.body);
     }
     if (req.headers.authorization !== `Bearer ${KEY}`) return send(res, 401, { code: 'UNAUTHORIZED', message: 'bad key' });
+    const browsing = url.pathname.match(/^\/api\/entities\/([^/]+)\/media\/browse$/);
+    if (browsing && req.method === 'GET') {
+      const query = Object.fromEntries(url.searchParams);
+      state.browseRequests.push({ entityId: decodeURIComponent(browsing[1]), ...query });
+      const found = state.browse[`${query.media_id ?? '-'}|${query.media_type ?? '-'}`];
+      if (!found) return send(res, 404, { code: 'NOT_FOUND', message: 'No such media' });
+      const media = found.pages ? found.pages[Number(query.page ?? 1) - 1] ?? { ...found.media, items: [] } : found.media;
+      return send(res, 200, { media }, { 'pagination-count': String(found.total ?? found.media.items?.length ?? 0) });
+    }
     const ui = url.pathname.match(/^\/api\/activities\/([^/]+)\/ui$/);
     if (ui && req.method === 'GET') {
       state.uiRequests += 1;

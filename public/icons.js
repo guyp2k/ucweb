@@ -84,6 +84,10 @@ export const ICONS = {
   star: ['M11.5 2.3a.5.5 0 0 1 1 0l2.3 4.7a2.1 2.1 0 0 0 1.6 1.2l5.2.7a.5.5 0 0 1 .3.9l-3.8 3.7a2.1 2.1 0 0 0-.6 1.9l.9 5.1a.5.5 0 0 1-.8.6l-4.6-2.4a2.1 2.1 0 0 0-2 0l-4.6 2.4a.5.5 0 0 1-.8-.6l.9-5.1a2.1 2.1 0 0 0-.6-1.9L2.2 9.8a.5.5 0 0 1 .3-.9l5.2-.8a2.1 2.1 0 0 0 1.6-1.2z'],
   subtitles: ['M5 4h14a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3z', 'M7 15h4', 'M15 15h2', 'M7 11h2', 'M13 11h4'],
   devices: ['M18 8V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h8', 'M7 19h5', 'M10 15v4', 'M18 12h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z'],
+  folder: ['M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z'],
+  library: ['M21 15V6', circle(18.5, 15.5, 2.5), 'M12 12H3', 'M16 6H3', 'M12 18H3'],
+  radio: ['M4.9 19.1C1 15.2 1 8.8 4.9 4.9', 'M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5', circle(12, 12, 2), 'M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5', 'M19.1 4.9C23 8.8 23 15.1 19.1 19'],
+  tag: ['M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4z', circle(7.5, 7.5, 0.5)],
   guide: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M3 9h18', 'M9 21V9'],
 };
 
@@ -107,6 +111,8 @@ export const UC_NAMES = {
   bluetooth: 'bluetooth', wifi: 'wifi', 'compact-disc': 'disc', music: 'music', headphones: 'headphones',
   microphone: 'mic', lightbulb: 'lightbulb', moon: 'moon', sun: 'sun', heart: 'heart', star: 'star',
   'closed-captioning': 'subtitles', 'table-list': 'guide',
+  folder: 'folder', 'folder-open': 'folder', 'list-music': 'library', 'file-music': 'music', radio: 'radio',
+  'masks-theater': 'tag', tag: 'tag', tags: 'tag',
 };
 
 export const SOURCES = [

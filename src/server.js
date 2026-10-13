@@ -163,7 +163,7 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
     throw new HttpError(405, `${req.method} is not allowed here.`);
   }
 
-  async function handleApi(req, res, parts) {
+  async function handleApi(req, res, parts, query) {
     const method = req.method;
     if (parts.length === 1 && parts[0] === 'config' && method === 'GET') {
       return sendJson(res, 200, { themes, defaultTheme });
@@ -183,6 +183,18 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
     }
     if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'image' && method === 'GET') {
       return sendImage(res, await findRemote(parts[1]).mediaImage(parts[3]), 'private, max-age=86400');
+    }
+    if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'browse' && method === 'GET') {
+      const page = query.has('page') ? Number(query.get('page')) : 1;
+      return sendJson(res, 200, await findRemote(parts[1]).browse(parts[3], {
+        mediaId: query.has('media_id') ? query.get('media_id') : undefined,
+        mediaType: query.has('media_type') ? query.get('media_type') : undefined,
+        page,
+      }));
+    }
+    if (parts.length === 6 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'thumbs' && method === 'GET') {
+      if (!/^[0-9a-f]{20}$/.test(parts[5])) throw new HttpError(400, 'That is not a picture key.');
+      return sendImage(res, await findRemote(parts[1]).thumbnail(parts[3], parts[5]), 'private, max-age=86400');
     }
     if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'player') {
       const remote = findRemote(parts[1]);
@@ -233,7 +245,7 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
         } catch {
           throw new HttpError(400, 'The address is not valid.');
         }
-        return await handleApi(req, res, parts);
+        return await handleApi(req, res, parts, url.searchParams);
       }
       if ((req.method === 'GET' || req.method === 'HEAD') && (await serveStatic(root, url.pathname, res))) return;
       sendJson(res, 404, { error: 'Not found.' });

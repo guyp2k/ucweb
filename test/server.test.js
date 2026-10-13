@@ -196,6 +196,17 @@ test('a signed-in browser can drive a player on an open page within what it supp
   assert.deepEqual(fake.state.commands, []);
 });
 
+test('browsing needs a session and a player on an open page that can browse; picture keys are checked', async () => {
+  await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages`);
+  const base2 = `/api/remotes/${encodeURIComponent(fake.address)}/entities/media.tv`;
+  assert.equal((await fetch(`${base}${base2}/browse`)).status, 401);
+  assert.equal((await authed(`${base2}/browse`)).status, 409);
+  assert.equal((await authed(`${base2}/browse?page=0`)).status, 409);
+  assert.equal((await authed(`${base2}/thumbs/not-a-key`)).status, 400);
+  assert.equal((await authed(`${base2}/thumbs/${'a'.repeat(20)}`)).status, 404);
+  assert.equal((await authed(`/api/remotes/${encodeURIComponent(fake.address)}/entities/media.tv/player`, { method: 'POST', body: '{"action":"play_media","value":{"mediaId":"x","mediaType":null}}' })).status, 409);
+});
+
 test('artwork is only served for a player on an open page', async () => {
   assert.equal((await authed(`/api/remotes/${encodeURIComponent(fake.address)}/entities/media.tv/image`)).status, 404);
 });

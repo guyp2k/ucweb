@@ -1,5 +1,6 @@
 import { batteryFill } from './battery.js';
 import { createPager } from './pages.js';
+import { createBrowser } from './browser.js';
 import { createChooser } from './chooser.js';
 import { createPlayer } from './player.js';
 
@@ -47,6 +48,7 @@ const state = {
   pager: null,
   player: null,
   chooser: null,
+  browser: null,
   view: 'pages',
   socket: null,
   socketAttempts: 0,
@@ -109,10 +111,11 @@ async function api(path, options = {}) {
 }
 
 let toastTimer = null;
-function toast(message) {
+function toast(message, { ok = false } = {}) {
   const node = $('toast');
-  const host = ['chooser', 'player'].map($).find((dialog) => dialog.open) ?? document.body;
+  const host = ['chooser', 'browser', 'player'].map($).find((dialog) => dialog.open) ?? document.body;
   if (node.parentElement !== host) host.append(node);
+  node.classList.toggle('is-ok', ok);
   node.textContent = message;
   node.hidden = false;
   clearTimeout(toastTimer);
@@ -268,6 +271,7 @@ function connect() {
       if (state.pagesKey?.startsWith(`${message.remote}\n`)) {
         state.pager.updateEntity(message.entity);
         state.player.update(message.entity);
+        state.browser.update(message.entity);
       }
       return;
     } else if (message.type === 'pages') {
@@ -556,9 +560,41 @@ async function chooseSource(remoteId, entityId) {
   if (chosen && chosen !== entity.source) await playerCommand(remoteId, entityId, 'select_source', chosen);
 }
 
+const PLAY_DONE = { PLAY_NEXT: 'Playing next.', ADD_TO_QUEUE: 'Added to the queue.' };
+
+async function browsePage(remoteId, entityId, { mediaId, mediaType, page }) {
+  const query = new URLSearchParams();
+  if (typeof mediaId === 'string') query.set('media_id', mediaId);
+  if (typeof mediaType === 'string') query.set('media_type', mediaType);
+  query.set('page', String(page));
+  return api(`/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/browse?${query}`);
+}
+
+async function playMedia(remoteId, entityId, item, how) {
+  flashLogo();
+  try {
+    const value = { mediaId: item.mediaId, mediaType: item.mediaType };
+    if (how) value.action = how;
+    await api(`/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/player`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'play_media', value }),
+    });
+    if (PLAY_DONE[how]) toast(`${item.title}: ${PLAY_DONE[how].toLowerCase()}`, { ok: true });
+    return true;
+  } catch (error) {
+    toast(error.message);
+    return false;
+  }
+}
+
 async function playerCommand(remoteId, entityId, action, value) {
   if (action === 'select_source' && value === undefined) {
     await chooseSource(remoteId, entityId);
+    return;
+  }
+  if (action === 'browse_media') {
+    const entity = state.pager.media(entityId)?.entity;
+    if (entity) state.browser.open(remoteId, entity);
     return;
   }
   flashLogo();
@@ -600,6 +636,7 @@ function renderControl(remote) {
     state.pager.clear();
     state.player.close();
     state.chooser.close();
+    state.browser.close();
     applyView();
     const message = !remote?.online && remote
       ? `${remote.name ?? remote.address} is offline.`
@@ -744,7 +781,7 @@ function initPad() {
   pad.addEventListener('contextmenu', (event) => event.preventDefault());
 
   document.addEventListener('keydown', (event) => {
-    if (!$('login').hidden || $('pad').hidden || $('player').open || $('chooser').open) return;
+    if (!$('login').hidden || $('pad').hidden || ['player', 'chooser', 'browser'].some((id) => $(id).open)) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.target.closest('input, select, textarea')) return;
     if ((event.key === 't' || event.key === 'T') && state.pager.hasPages) {
@@ -786,6 +823,12 @@ async function boot() {
     },
   });
   state.chooser = createChooser($('chooser'));
+  state.browser = createBrowser($('browser'), {
+    fetchPage: browsePage,
+    onPlay: playMedia,
+    thumbUrl: (remoteId, entityId, key) => `/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/thumbs/${key}`,
+    chooseAction: (options) => state.chooser.choose({ ...options, current: null }),
+  });
   state.player = createPlayer($('player'), { onCommand: playerCommand, imageUrl });
   initLogin();
   initViewSwitch();
