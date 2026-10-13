@@ -184,6 +184,14 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
     if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'image' && method === 'GET') {
       return sendImage(res, await findRemote(parts[1]).mediaImage(parts[3]), 'private, max-age=86400');
     }
+    if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'player') {
+      const remote = findRemote(parts[1]);
+      if (method !== 'POST') throw new HttpError(405, `${method} is not allowed here.`);
+      if (!sameOrigin(req)) throw new HttpError(403, 'Cross-site requests are not allowed.');
+      const { action, value } = await readJsonBody(req);
+      await remote.playerCommand(parts[3], action, value);
+      return sendJson(res, 200, { ok: true });
+    }
     if (parts[0] === 'remotes' && parts[2] === 'activities' && parts.length >= 5) {
       const remote = findRemote(parts[1]);
       const activityId = parts[3];

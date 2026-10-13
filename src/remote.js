@@ -11,6 +11,21 @@ const SYSTEM_COMMANDS = new Set(['REBOOT', 'POWER_OFF']);
 const ITEM_TYPES = new Set(['text', 'icon', 'media_player', 'sensor', 'select']);
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const REPEAT_MODES = new Set(['OFF', 'ALL', 'ONE']);
+const PLAYER_ACTIONS = {
+  play_pause: { feature: 'play_pause' },
+  stop: { feature: 'stop' },
+  previous: { feature: 'previous' },
+  next: { feature: 'next' },
+  volume_up: { feature: 'volume_up_down' },
+  volume_down: { feature: 'volume_up_down' },
+  mute_toggle: { feature: 'mute_toggle' },
+  seek: { feature: 'seek', param: 'media_position' },
+  volume: { feature: 'volume', param: 'volume' },
+  shuffle: { feature: 'shuffle', param: 'shuffle' },
+  repeat: { feature: 'repeat', param: 'repeat' },
+};
+const PLAYER_FEATURES = [...new Set(Object.values(PLAYER_ACTIONS).map((action) => action.feature))];
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -160,6 +175,11 @@ export function toEntityView(watched, now = Date.now()) {
       duration: duration !== null && duration > 0 ? duration : null,
       position: mediaPosition(watched, now),
       image: image ? createHash('sha256').update(image).digest('hex').slice(0, 16) : null,
+      features: PLAYER_FEATURES.filter((feature) => (watched.features ?? []).includes(feature)),
+      volume: finite(attributes.volume),
+      muted: typeof attributes.muted === 'boolean' ? attributes.muted : null,
+      shuffle: typeof attributes.shuffle === 'boolean' ? attributes.shuffle : null,
+      repeat: REPEAT_MODES.has(attributes.repeat) ? attributes.repeat : null,
     });
   } else if (watched.entity_type === 'sensor') {
     const unit = attributes.unit ?? watched.options?.custom_unit;
@@ -177,6 +197,7 @@ function toWatched(entity, now) {
     entity_type: entity.entity_type,
     name: entity.name,
     options: entity.options ?? null,
+    features: Array.isArray(entity.features) ? entity.features.filter((feature) => typeof feature === 'string') : [],
     attributes: { ...entity.attributes },
     positionAt: finite(entity.attributes?.media_position) === null ? null : now,
   };
@@ -362,6 +383,33 @@ export class Remote extends EventEmitter {
     if (image.body.length > MAX_IMAGE_BYTES) throw new HttpError(502, 'The image is too large.');
     this.#images.set(entityId, image);
     return image;
+  }
+
+  async playerCommand(entityId, action, value) {
+    const watched = this.#watched.get(entityId);
+    if (!watched || watched.entity_type !== 'media_player') throw new HttpError(404, 'That player is not on a page that is open.');
+    const rule = Object.hasOwn(PLAYER_ACTIONS, action) ? PLAYER_ACTIONS[action] : null;
+    if (!rule) throw new HttpError(400, `Send one of ${Object.keys(PLAYER_ACTIONS).join(', ')}.`);
+    const name = localizedText(watched.name) ?? entityId;
+    if (!watched.features.includes(rule.feature)) throw new HttpError(409, `${name} cannot ${action.replace('_', ' ')}.`);
+    let params;
+    if (action === 'seek') {
+      const duration = finite(watched.attributes.media_duration);
+      if (finite(value) === null || value < 0 || (duration !== null && duration > 0 && value > duration)) {
+        throw new HttpError(400, 'Send a position in seconds within the track.');
+      }
+      params = { media_position: Math.round(value) };
+    } else if (action === 'volume') {
+      if (!Number.isInteger(value) || value < 0 || value > 100) throw new HttpError(400, 'Send a volume from 0 to 100.');
+      params = { volume: value };
+    } else if (action === 'shuffle') {
+      if (typeof value !== 'boolean') throw new HttpError(400, 'Send shuffle as true or false.');
+      params = { shuffle: value };
+    } else if (action === 'repeat') {
+      if (!REPEAT_MODES.has(value)) throw new HttpError(400, 'Send repeat as OFF, ALL or ONE.');
+      params = { repeat: value };
+    }
+    await this.#command({ entityId, cmdId: `media_player.${action}`, params });
   }
 
   async #command({ entityId, cmdId, params }) {
