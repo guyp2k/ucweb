@@ -1,8 +1,20 @@
 # ucweb
 
 A web remote for [Unfolded Circle](https://www.unfoldedcircle.com/) Remote 3 and Remote Two. Open it on a phone
-or in a desktop browser to start and stop activities, drive the D-pad, volume and transport buttons, and watch
-every remote's status live.
+or in a desktop browser to start and stop activities, use your activity pages, drive the D-pad, volume and
+transport buttons, play from your music library, and watch every remote's status live.
+
+![ucweb on a desktop: status bar, activities and the Now Playing page](docs/screenshots/desktop.webp)
+
+<p align="center">
+  <img src="docs/screenshots/phone-now.webp" width="240" alt="Activity page with a media widget and its controls">
+  <img src="docs/screenshots/phone-player.webp" width="240" alt="Full player with seek, transport, volume and source">
+  <img src="docs/screenshots/phone-library.webp" width="240" alt="Library browser showing playlists">
+</p>
+
+The screenshots use made-up remotes, activities and music.
+
+## Features
 
 - **Activities**: every activity on each remote, with its live state (on, off, working, error). Tap to start,
   tap again to control, one tap to turn off.
@@ -51,21 +63,46 @@ the player reports, without the API key, and only image types are passed on.
 
 ## Install
 
+You need:
+
+- One or more Unfolded Circle remotes on your network, and each one's **web-configurator PIN**: the PIN you use to
+  sign in to the remote's web configurator.
+- A machine that runs Docker on the same network as the remotes: Unraid, a NAS, a Raspberry Pi, any Linux box.
+- For step 1, a computer with `bash`, `curl` and `python3`: macOS and most Linux machines have them. Unraid does not
+  ship `python3`, so run step 1 from a laptop and copy the key files over.
+
 ### 1. Create an API key on each remote
 
-On any computer with `curl` and `python3` on the same network:
+Give each remote a fixed IP address in your router first, so ucweb can always find it. Then, from a clone of this
+repository (or just a download of `scripts/create-api-key.sh`):
 
 ```sh
 UC_KEYS_DIR=./keys scripts/create-api-key.sh 192.168.1.20
 ```
 
-It asks for the remote's web-configurator PIN once, creates a key named `ucweb` and saves it as
-`keys/<remote hostname>.key` (for example `keys/Remote3-66ebba.key`). Run it once per remote. Use `--replace` to
-issue a new key, or `--check` to test a stored one.
+```text
+Web-configurator PIN for Living Room (192.168.1.20):
+Created the ucweb key for Living Room and stored it in ./keys/Remote3-a1b2c3.key.
+The key in ./keys/Remote3-a1b2c3.key works on Living Room (192.168.1.20).
+```
+
+It asks for that remote's web-configurator PIN once (it is not saved), creates an API key named `ucweb`, and saves
+it as `keys/<remote hostname>.key`. ucweb finds each key by that file name, so leave the names as they are. Run it
+once per remote. `--check` tests a stored key and `--replace` revokes the old `ucweb` key and issues a new one.
+
+The key has admin scope on that remote: treat the files like passwords.
 
 ### 2. Run the container
 
-Put the key files in the `keys` folder of the config volume, then start ucweb with your remotes' addresses:
+Put the key files in a `keys` folder inside the folder you give ucweb as `/config`, then start it with your
+remotes' addresses:
+
+```text
+/path/to/ucweb/
+└── keys/
+    ├── Remote3-a1b2c3.key
+    └── Remote3-d4e5f6.key
+```
 
 ```sh
 docker run -d --name ucweb --init --restart unless-stopped \
@@ -91,16 +128,122 @@ services:
       UC_REMOTES: 192.168.1.20,192.168.1.21
 ```
 
-**Unraid**: use the template in `unraid/ucweb.xml` (Docker tab, Add Container, Template URL
-`https://raw.githubusercontent.com/guyp2k/ucweb/main/unraid/ucweb.xml`).
+#### On Unraid, step by step
+
+1. Install the template. In a terminal on the server (the `>_` button at the top of the web UI):
+
+   ```sh
+   wget -O /boot/config/plugins/dockerMan/templates-user/my-ucweb.xml \
+     https://raw.githubusercontent.com/guyp2k/ucweb/main/unraid/ucweb.xml
+   ```
+
+2. Copy the key files from step 1 to `/mnt/user/appdata/ucweb/keys/` (over the network share, or with `scp`).
+3. Open **Docker**, then **Add Container**, and pick **ucweb** under *User templates*.
+4. Fill in **Remotes** with your remotes' IP addresses, comma separated. Leave **Config** at
+   `/mnt/user/appdata/ucweb`.
+5. Choose the network. **Bridge** serves ucweb on the server's IP at the **Web UI port** (8080). A custom network
+   such as `br0` gives ucweb its own IP address, served on port 8080. Either works; the custom network keeps port
+   8080 free on the server.
+6. Optional, under *Show more settings*: the **Default theme** for browsers that have not picked one. PUID 99 and
+   PGID 100 are Unraid's defaults; keep them.
+7. **Apply**. The container log should show `connected to <remote name>` once for each remote.
 
 ### 3. Set the PIN
+
+ucweb asks for its own PIN before anyone can use it. Set it once:
 
 ```sh
 docker exec -it ucweb npm run set-pin
 ```
 
-Then open `http://<server>:8080/` and sign in. Run it again to change the PIN; that signs every browser out.
+On Unraid you can also click the ucweb icon on the Docker page, choose **Console**, and run `npm run set-pin`.
+
+Then open `http://<server>:8080/` (or the container's own IP on a custom network) and sign in:
+
+<p align="center"><img src="docs/screenshots/login.webp" width="560" alt="PIN sign-in page"></p>
+
+Run `set-pin` again any time to change the PIN; that signs every browser out. Add the page to your phone's home
+screen and it opens full screen like an app.
+
+## Using ucweb
+
+**Activities.** Every activity on the selected remote, with its live state. Tap one that is off to start it, tap a
+running one to control it, and use **Turn off** to stop it. Switch remotes with the tabs at the top; each tab shows
+that remote's battery.
+
+**Pages and controls.** A running activity shows its pages, laid out on the grid you built in the web configurator,
+or the control pad. The **Pages | Controls** switch flips between them (`T` on a keyboard). Swipe, use the arrows
+or dots, or press `[` and `]` to change page; the house button beside the page name (or `0`) goes back to the first
+page. ucweb remembers the last page per activity.
+
+<p align="center">
+  <img src="docs/screenshots/phone-sources.webp" width="200" alt="Sources page with input and output icons">
+  <img src="docs/screenshots/phone-status.webp" width="200" alt="Sensor tiles and buttons">
+  <img src="docs/screenshots/phone-apps.webp" width="200" alt="Apps page">
+  <img src="docs/screenshots/phone-controls.webp" width="200" alt="Control pad with D-pad, volume, channel and transport">
+</p>
+
+**Icons.** ucweb draws every icon itself, in the current theme, from what the button does: the input it selects
+(HDMI, USB, optical, RCA, XLR, Bluetooth...), the command it sends (home, back, menu, settings) or the app it opens.
+Apps appear by name. Icon images uploaded to the remote are not shown, so pages look consistent in every theme.
+
+**Media.** A media widget shows artwork, title, artist and live progress, with previous, play and pause, next,
+shuffle, repeat, the library and the source picker underneath, each only when that player supports it. Tap the
+artwork for the full player, with seek and volume. The library button browses the player's own library (playlists,
+albums, radio) and plays or queues what you pick. The source button picks the player's input or output; for Spotify
+that is the list of Spotify Connect devices.
+
+<p align="center">
+  <img src="docs/screenshots/phone-sources-chooser.webp" width="240" alt="Source chooser">
+</p>
+
+**Keyboard** (desktop):
+
+| Key | Does |
+|---|---|
+| Arrows, Enter | D-pad and OK |
+| Backspace or Escape | Back |
+| Home | Home |
+| `+` `-` | Volume up and down |
+| `M` | Mute |
+| Space | Play or pause |
+| Page Up, Page Down | Channel up and down |
+| `[` `]` | Previous and next page |
+| `0` | First page |
+| `T` | Switch between pages and controls |
+
+**Remote panel.** At the bottom of the page: open the remote's own web configurator, reboot the remote, or power
+it off. Reboot and power off ask you to tap twice.
+
+**Themes.** Pick one from the menu at the top. Each browser keeps its own choice.
+
+<p align="center">
+  <img src="docs/screenshots/theme-miyara.webp" width="220" alt="Miyara theme">
+  <img src="docs/screenshots/theme-roon-light.webp" width="220" alt="Roon Light theme">
+  <img src="docs/screenshots/theme-graphite-brass.webp" width="220" alt="Graphite and Brass theme">
+</p>
+
+## Updating
+
+Pull the new image and recreate the container (`docker compose pull && docker compose up -d`, or on Unraid
+**Check for Updates**, then **Apply update**). Open browsers notice the new version and reload themselves. Your
+keys, PIN and sign-ins are kept in `/config`.
+
+## Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| A remote shows **Offline** with "No API key for ... expected /config/keys/....key" | The key file is missing or misnamed. Its name must be the remote's hostname, exactly as `create-api-key.sh` saved it. |
+| "The API key was rejected" | The key was deleted on the remote or the remote was reset. Run `create-api-key.sh <ip> --replace` and copy the new file over. |
+| "... did not answer" | Check the IP in `UC_REMOTES` and that the server can reach the remote (same network or a firewall rule between VLANs). A remote that is asleep off its dock drops off Wi-Fi; ucweb reconnects on its own when it wakes. |
+| The status bar says **Low power** | Normal. A docked remote dozes with its screen off but stays connected and controllable. |
+| Battery says **Not readable** | Some firmware answers battery requests with an error while docked in low power. ucweb asks again every minute and clears it as soon as an answer comes. In testing, shortening the remote's sleep timeout from 10 to 5 minutes made it go away. |
+| "No PIN is set yet" | Run `docker exec -it ucweb npm run set-pin`, then reload the page. |
+| Sign-in is refused even with the right PIN | Too many wrong PINs: a browser waits 30 seconds after five misses, doubling up to 15 minutes, and 30 misses in 15 minutes lock sign-in for everyone until the window passes. |
+| A pad button is dimmed | That button is not mapped in the activity. Map it in the web configurator under the activity's button mapping. |
+| A widget says **Player not available** or **Unavailable** | The page points at a device the remote no longer has, or its integration is offline. Fix the page or the integration in the web configurator. |
+| A library list says it has items but shows none | The player listed the folder but sent no items. Spotify does this for some playlists; ucweb says so instead of loading forever. |
+| The page looks out of date after an update | Reload once. ucweb reloads by itself on new versions, but a page left open across a restart may need a nudge. |
 
 ## Settings
 
