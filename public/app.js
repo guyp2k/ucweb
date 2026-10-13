@@ -3,7 +3,7 @@ import { createPager } from './pages.js';
 
 const $ = (id) => document.getElementById(id);
 
-const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote', pages: 'ucweb.pages' };
+const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote', pages: 'ucweb.pages', view: 'ucweb.view' };
 const REPEAT_DELAY_MS = 400;
 const REPEAT_EVERY_MS = 180;
 const RECONNECT_MS = [1000, 2000, 5000, 10000];
@@ -43,6 +43,7 @@ const state = {
   buttonsKey: null,
   pagesKey: null,
   pager: null,
+  view: 'pages',
   socket: null,
   socketAttempts: 0,
   reconnectTimer: null,
@@ -449,6 +450,50 @@ async function loadButtons(remote, activity) {
   applyButtons();
 }
 
+function applyView({ animate = false } = {}) {
+  const switcher = $('view-switch');
+  const hasPages = state.pager.hasPages;
+  const active = !$('pad').hidden || hasPages;
+  const view = hasPages ? state.view : 'controls';
+  switcher.hidden = !hasPages || $('pad').hidden;
+  $('hint').hidden = !active;
+  const panel = document.querySelector('.control-panel');
+  if (animate && panel.dataset.view !== view) {
+    panel.classList.remove('is-switching');
+    void panel.offsetWidth;
+    panel.classList.add('is-switching');
+  }
+  panel.dataset.view = view;
+  for (const tab of switcher.querySelectorAll('[data-view]')) {
+    const selected = tab.dataset.view === view;
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  }
+}
+
+function setView(view) {
+  if (!state.pager.hasPages || view === state.view) return;
+  state.view = view;
+  save(STORAGE.view, view);
+  applyView({ animate: true });
+}
+
+function initViewSwitch() {
+  state.view = load(STORAGE.view) === 'controls' ? 'controls' : 'pages';
+  const switcher = $('view-switch');
+  switcher.addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-view]');
+    if (tab) setView(tab.dataset.view);
+  });
+  switcher.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    event.stopPropagation();
+    setView(state.view === 'pages' ? 'controls' : 'pages');
+    switcher.querySelector(`[data-view="${state.view}"]`).focus();
+  });
+}
+
 const visiblePages = (pages) => pages.filter((page) => page.items.length > 0);
 
 async function loadPages(remote, activity, { force = false } = {}) {
@@ -456,21 +501,27 @@ async function loadPages(remote, activity, { force = false } = {}) {
   if (state.pagesKey === key && !force) return;
   const fresh = state.pagesKey !== key;
   state.pagesKey = key;
-  if (fresh) state.pager.clear();
+  if (fresh) {
+    state.pager.clear();
+    applyView();
+  }
   try {
     const data = await api(`/api/remotes/${encodeURIComponent(remote.id)}/activities/${encodeURIComponent(activity.id)}/pages`);
     if (state.pagesKey !== key) return;
     const pages = visiblePages(data.pages);
     if (pages.length === 0) {
       state.pager.clear();
+      applyView();
       return;
     }
     state.pager.show({ key, pages, entities: data.entities, pageId: rememberedPages()[key], remoteId: remote.id });
     state.pager.setEnabled(Boolean(currentRemote()?.online));
+    applyView();
   } catch (error) {
     if (state.pagesKey !== key) return;
     state.pagesKey = null;
     state.pager.clear();
+    applyView();
     toast(error.message);
   }
 }
@@ -507,6 +558,7 @@ function renderControl(remote) {
     state.buttonsKey = null;
     state.pagesKey = null;
     state.pager.clear();
+    applyView();
     const message = !remote?.online && remote
       ? `${remote.name ?? remote.address} is offline.`
       : 'Nothing is running. Start an activity to use the controls.';
@@ -521,6 +573,7 @@ function renderControl(remote) {
   loadButtons(remote, activity);
   loadPages(remote, activity);
   state.pager.setEnabled(remote.online);
+  applyView();
 }
 
 function renderSectionMeta(remote) {
@@ -652,7 +705,12 @@ function initPad() {
     if (!$('login').hidden || $('pad').hidden) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.target.closest('input, select, textarea')) return;
-    if ((event.key === '[' || event.key === ']') && !$('pages').hidden) {
+    if ((event.key === 't' || event.key === 'T') && state.pager.hasPages) {
+      event.preventDefault();
+      setView(state.view === 'pages' ? 'controls' : 'pages');
+      return;
+    }
+    if ((event.key === '[' || event.key === ']') && state.pager.hasPages && state.view === 'pages') {
       event.preventDefault();
       state.pager.step(event.key === '[' ? -1 : 1);
       return;
@@ -675,6 +733,7 @@ async function boot() {
     imageUrl: (remoteId, entityId, version) => `/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/image?v=${encodeURIComponent(version)}`,
   });
   initLogin();
+  initViewSwitch();
   initPad();
   initSystem();
   try {

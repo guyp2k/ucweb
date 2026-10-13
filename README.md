@@ -11,7 +11,9 @@ every remote's status live.
   use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. On a
   desktop the keyboard works too: arrows, Enter, Backspace, + and -, M and Space.
 - **Activity pages**: the pages you built for each activity in the web configurator, laid out on the same grid.
-  Swipe, use the arrows or dots, or press `[` and `]` to slide between them. Buttons send exactly the command the
+  Swipe, use the arrows or dots, or press `[` and `]` to slide between them. A Pages | Controls switch (or `T` on a
+  keyboard) flips between the pages and the control pad, and each browser remembers which one you use. The keyboard
+  shortcuts for the pad work in both views. Buttons send exactly the command the
   page stores. Media widgets show artwork, title, artist and live progress, and sensor and select widgets show their
   current value, all updated live. ucweb draws every icon itself in the current theme, picked from what the button
   does (the input it selects, the app it opens, the command it sends), so a page looks the same in every theme.

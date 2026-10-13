@@ -96,9 +96,20 @@
         <div class="control-panel">
           <div class="control-head" id="control-head"></div>
 
-          <div class="pages" id="pages" hidden></div>
+          <div class="view-switch" id="view-switch" role="tablist" aria-label="Show" hidden>
+            <button type="button" role="tab" data-view="pages" aria-controls="pages">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM3 9h18M9 21V9"/></svg>
+              <span>Pages</span>
+            </button>
+            <button type="button" role="tab" data-view="controls" aria-controls="pad">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM12 4.5v2M12 17.5v2M4.5 12h2M17.5 12h2"/></svg>
+              <span>Controls</span>
+            </button>
+          </div>
 
-          <div class="pad" id="pad" hidden>
+          <div class="pages" id="pages" role="tabpanel" hidden></div>
+
+          <div class="pad" id="pad" role="tabpanel" hidden>
             <div class="pad-row pad-top">
               <button class="key" data-button="BACK" aria-label="Back">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M4 12h11a5 5 0 0 1 0 10h-2"/></svg>
@@ -168,8 +179,8 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M5 5l10 7-10 7z"/></svg>
               </button>
             </div>
-            <p class="hint">Keyboard: arrows, Enter, Backspace, + and -, M, Space. [ and ] change page.</p>
           </div>
+          <p class="hint" id="hint" hidden>Keyboard: arrows, Enter, Backspace, + and -, M, Space. [ and ] change page, T switches pages and controls.</p>
         </div>
       </section>
     </div>
