@@ -39,7 +39,7 @@ function clock(seconds) {
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function createPager(root, { onPress, onIndex, imageUrl }) {
+export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer }) {
   const title = el('div', 'pages-title');
   const name = el('h4', 'pages-name');
   const count = el('span', 'pages-count');
@@ -169,6 +169,16 @@ export function createPager(root, { onPress, onIndex, imageUrl }) {
   }
 
   function fillMedia(node, entity) {
+    node.classList.toggle('is-openable', Boolean(entity));
+    if (entity) {
+      node.tabIndex = 0;
+      node.setAttribute('role', 'button');
+      node.setAttribute('aria-label', `Open the player for ${entity.name}`);
+    } else {
+      node.removeAttribute('tabindex');
+      node.removeAttribute('role');
+      node.removeAttribute('aria-label');
+    }
     const art = el('div', 'media-art');
     const backdrop = el('div', 'media-backdrop');
     node.classList.toggle('is-unavailable', !entity || entity.state === 'UNAVAILABLE');
@@ -306,6 +316,18 @@ export function createPager(root, { onPress, onIndex, imageUrl }) {
     } else {
       node = el('div', `page-item ${WIDGET_CLASSES[item.type]}`);
       node.dataset.entity = item.entityId;
+      if (item.type === 'media_player') {
+        const open = () => {
+          if (view.media.has(item.entityId)) onOpenPlayer?.(item.entityId);
+        };
+        node.addEventListener('click', open);
+        node.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          event.stopPropagation();
+          open();
+        });
+      }
       fillWidget(node, item);
     }
     node.style.gridColumn = `${item.x + 1} / span ${width}`;
@@ -485,5 +507,14 @@ export function createPager(root, { onPress, onIndex, imageUrl }) {
     event.stopPropagation();
   }, true);
 
-  return { show, updateEntity, setEnabled, clear, step, get key() { return view.key; }, get hasPages() { return view.pages.length > 0; } };
+  return {
+    show,
+    updateEntity,
+    setEnabled,
+    clear,
+    step,
+    media: (entityId) => view.media.get(entityId) ?? null,
+    get key() { return view.key; },
+    get hasPages() { return view.pages.length > 0; },
+  };
 }

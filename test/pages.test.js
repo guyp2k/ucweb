@@ -40,7 +40,8 @@ const entities = {
     entity_id: 'media.dmp',
     entity_type: 'media_player',
     name: { en: 'ES-DMP-A10' },
-    attributes: { state: 'PLAYING', media_title: 'So What', media_artist: 'Miles Davis', media_album: 'Kind of Blue', media_duration: 545, media_position: 30, media_image_url: '' },
+    features: ['on_off', 'play_pause', 'next', 'previous', 'seek', 'volume', 'volume_up_down', 'mute_toggle', 'media_title', 'select_source'],
+    attributes: { state: 'PLAYING', media_title: 'So What', media_artist: 'Miles Davis', media_album: 'Kind of Blue', media_duration: 545, media_position: 30, media_image_url: '', volume: 42, muted: false },
   },
   'sensor.volume': { entity_id: 'sensor.volume', entity_type: 'sensor', name: { en: 'DMP Volume' }, options: { custom_unit: '%' }, attributes: { state: 'ON', value: '42' } },
   'select.output': { entity_id: 'select.output', entity_type: 'select', name: { en: 'Output' }, attributes: { state: 'ON', current_option: 'XLR', options: ['XLR', 'RCA'] } },
@@ -276,4 +277,79 @@ test('artwork is refused for players not on an open page, empty players and non-
   fake.emit('entity_change', { entity_type: 'media_player', entity_id: 'media.dmp', event_type: 'CHANGE', new_state: { attributes: { media_image_url: 'file:///etc/passwd' } } });
   await new Promise((resolve) => setTimeout(resolve, 50));
   await assert.rejects(remote.mediaImage('media.dmp'), { status: 502 });
+});
+
+test('a player reports only the controls ucweb offers that it supports, with its volume and modes', async () => {
+  await connect();
+  const { entities: states } = await remote.pages('act.tv');
+  const player = states['media.dmp'];
+  assert.deepEqual(player.features, ['play_pause', 'previous', 'next', 'volume_up_down', 'mute_toggle', 'seek', 'volume']);
+  assert.equal(player.volume, 42);
+  assert.equal(player.muted, false);
+  assert.equal(player.shuffle, null);
+  assert.equal(player.repeat, null);
+});
+
+test('player controls send the media player command the player supports', async () => {
+  await connect();
+  await remote.pages('act.tv');
+  await remote.playerCommand('media.dmp', 'play_pause');
+  await remote.playerCommand('media.dmp', 'next');
+  await remote.playerCommand('media.dmp', 'mute_toggle');
+  await remote.playerCommand('media.dmp', 'seek', 120.4);
+  await remote.playerCommand('media.dmp', 'volume', 35);
+  assert.deepEqual(fake.state.commands, [
+    { entityId: 'media.dmp', body: { cmd_id: 'media_player.play_pause' } },
+    { entityId: 'media.dmp', body: { cmd_id: 'media_player.next' } },
+    { entityId: 'media.dmp', body: { cmd_id: 'media_player.mute_toggle' } },
+    { entityId: 'media.dmp', body: { cmd_id: 'media_player.seek', params: { media_position: 120 } } },
+    { entityId: 'media.dmp', body: { cmd_id: 'media_player.volume', params: { volume: 35 } } },
+  ]);
+});
+
+test('a control the player does not support is refused before it reaches the remote', async () => {
+  await connect();
+  await remote.pages('act.tv');
+  await assert.rejects(remote.playerCommand('media.dmp', 'stop'), { status: 409 });
+  await assert.rejects(remote.playerCommand('media.dmp', 'shuffle', true), { status: 409 });
+  await assert.rejects(remote.playerCommand('media.dmp', 'repeat', 'ALL'), { status: 409 });
+  assert.deepEqual(fake.state.commands, []);
+});
+
+test('player values are checked: seek within the track, volume 0 to 100', async () => {
+  await connect();
+  await remote.pages('act.tv');
+  for (const value of [-1, 546, '60', Number.NaN, undefined]) {
+    await assert.rejects(remote.playerCommand('media.dmp', 'seek', value), { status: 400 }, String(value));
+  }
+  for (const value of [-1, 101, 50.5, '50', true]) {
+    await assert.rejects(remote.playerCommand('media.dmp', 'volume', value), { status: 400 }, String(value));
+  }
+  assert.deepEqual(fake.state.commands, []);
+});
+
+test('shuffle and repeat take only their own values', async () => {
+  const players = structuredClone(entities);
+  players['media.dmp'].features.push('shuffle', 'repeat');
+  await connect({ entities: players });
+  await remote.pages('act.tv');
+  await assert.rejects(remote.playerCommand('media.dmp', 'shuffle', 'yes'), { status: 400 });
+  await assert.rejects(remote.playerCommand('media.dmp', 'repeat', 'SOME'), { status: 400 });
+  await remote.playerCommand('media.dmp', 'shuffle', true);
+  await remote.playerCommand('media.dmp', 'repeat', 'ONE');
+  assert.deepEqual(fake.state.commands.map((command) => command.body), [
+    { cmd_id: 'media_player.shuffle', params: { shuffle: true } },
+    { cmd_id: 'media_player.repeat', params: { repeat: 'ONE' } },
+  ]);
+});
+
+test('unknown actions and players not on an open page are refused', async () => {
+  await connect();
+  await assert.rejects(remote.playerCommand('media.dmp', 'play_pause'), { status: 404 });
+  await remote.pages('act.tv');
+  for (const action of ['off', 'toggle', 'select_source', '__proto__', 'toString', 'constructor', undefined]) {
+    await assert.rejects(remote.playerCommand('media.dmp', action), { status: 400 }, String(action));
+  }
+  await assert.rejects(remote.playerCommand('sensor.volume', 'play_pause'), { status: 404 });
+  assert.deepEqual(fake.state.commands, []);
 });

@@ -35,11 +35,15 @@ before(async () => {
           items: [
             { type: 'text', text: 'Input', command: { entity_id: 'media.tv', cmd_id: 'media_player.select_source', params: { source: 'HDMI 1' } }, location: { x: 0, y: 0 }, size: { width: 2, height: 1 } },
             { type: 'sensor', sensor: { sensor_id: 'sensor.vol' }, location: { x: 2, y: 0 }, size: { width: 2, height: 1 } },
+            { type: 'media_player', media_player_id: 'media.tv', location: { x: 0, y: 1 }, size: { width: 4, height: 3 } },
           ],
         }],
       },
     },
-    entities: { 'sensor.vol': { entity_id: 'sensor.vol', entity_type: 'sensor', name: { en: 'Volume' }, attributes: { state: 'ON', value: '30', unit: 'dB' } } },
+    entities: {
+      'media.tv': { entity_id: 'media.tv', entity_type: 'media_player', name: { en: 'TV' }, features: ['play_pause', 'next'], attributes: { state: 'PLAYING' } },
+      'sensor.vol': { entity_id: 'sensor.vol', entity_type: 'sensor', name: { en: 'Volume' }, attributes: { state: 'ON', value: '30', unit: 'dB' } },
+    },
   });
   remote = new Remote({ address: fake.address, keysDir: dir, reconnectDelays: [20] });
   remote.start();
@@ -152,7 +156,7 @@ test('a signed-in browser gets an activity\'s pages with the state of their widg
   const response = await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages`);
   assert.equal(response.status, 200);
   const { pages, entities } = await response.json();
-  assert.deepEqual(pages.map((page) => [page.id, page.name, page.items.length]), [['main', 'Main', 2]]);
+  assert.deepEqual(pages.map((page) => [page.id, page.name, page.items.length]), [['main', 'Main', 3]]);
   assert.equal(pages[0].items[0].action, true);
   assert.equal(JSON.stringify(pages).includes('select_source'), false);
   assert.deepEqual(entities['sensor.vol'], { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', value: '30', unit: 'dB' });
@@ -174,6 +178,21 @@ test('page item presses are refused without a session, from another site, or for
   assert.equal((await authed(`${route}/-1`, { method: 'POST', body: '{}' })).status, 400);
   assert.equal((await authed(`${route}/1e3`, { method: 'POST', body: '{}' })).status, 400);
   assert.equal((await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages/other/items/0`, { method: 'POST', body: '{}' })).status, 404);
+  assert.deepEqual(fake.state.commands, []);
+});
+
+test('a signed-in browser can drive a player on an open page within what it supports', async () => {
+  await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages`);
+  fake.state.commands.length = 0;
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/entities/media.tv/player`;
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"play_pause"}' })).status, 200);
+  assert.deepEqual(fake.state.commands, [{ entityId: 'media.tv', body: { cmd_id: 'media_player.play_pause' } }]);
+  fake.state.commands.length = 0;
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"seek","value":10}' })).status, 409);
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"off"}' })).status, 400);
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"next"}', headers: { origin: 'http://evil.example' } })).status, 403);
+  assert.equal((await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"next"}' })).status, 401);
+  assert.equal((await authed(route)).status, 405);
   assert.deepEqual(fake.state.commands, []);
 });
 

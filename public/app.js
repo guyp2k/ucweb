@@ -1,5 +1,6 @@
 import { batteryFill } from './battery.js';
 import { createPager } from './pages.js';
+import { createPlayer } from './player.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -43,6 +44,7 @@ const state = {
   buttonsKey: null,
   pagesKey: null,
   pager: null,
+  player: null,
   view: 'pages',
   socket: null,
   socketAttempts: 0,
@@ -107,6 +109,8 @@ async function api(path, options = {}) {
 let toastTimer = null;
 function toast(message) {
   const node = $('toast');
+  const host = $('player').open ? $('player') : document.body;
+  if (node.parentElement !== host) host.append(node);
   node.textContent = message;
   node.hidden = false;
   clearTimeout(toastTimer);
@@ -259,7 +263,10 @@ function connect() {
       stalePages = Boolean(before && !before.online && message.remote.online);
       state.remotes.set(message.remote.id, message.remote);
     } else if (message.type === 'entity') {
-      if (state.pagesKey?.startsWith(`${message.remote}\n`)) state.pager.updateEntity(message.entity);
+      if (state.pagesKey?.startsWith(`${message.remote}\n`)) {
+        state.pager.updateEntity(message.entity);
+        state.player.update(message.entity);
+      }
       return;
     } else if (message.type === 'pages') {
       if (state.pagesKey === `${message.remote}\n${message.activity}`) refreshPages();
@@ -503,6 +510,7 @@ async function loadPages(remote, activity, { force = false } = {}) {
   state.pagesKey = key;
   if (fresh) {
     state.pager.clear();
+    state.player.close();
     applyView();
   }
   try {
@@ -532,6 +540,25 @@ function refreshPages() {
   if (remote && activity && state.pagesKey === `${remote.id}\n${activity.id}`) loadPages(remote, activity, { force: true });
 }
 
+function openPlayer(entityId) {
+  const remote = currentRemote();
+  const media = state.pager.media(entityId);
+  if (!remote?.online || !media) return;
+  state.player.open(remote.id, media.entity, media.at);
+}
+
+async function playerCommand(remoteId, entityId, action, value) {
+  flashLogo();
+  try {
+    await api(`/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/player`, {
+      method: 'POST',
+      body: JSON.stringify(value === undefined ? { action } : { action, value }),
+    });
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 async function pressItem(pageId, index) {
   const remote = currentRemote();
   const activity = controlledActivity(remote);
@@ -558,6 +585,7 @@ function renderControl(remote) {
     state.buttonsKey = null;
     state.pagesKey = null;
     state.pager.clear();
+    state.player.close();
     applyView();
     const message = !remote?.online && remote
       ? `${remote.name ?? remote.address} is offline.`
@@ -702,7 +730,7 @@ function initPad() {
   pad.addEventListener('contextmenu', (event) => event.preventDefault());
 
   document.addEventListener('keydown', (event) => {
-    if (!$('login').hidden || $('pad').hidden) return;
+    if (!$('login').hidden || $('pad').hidden || $('player').open) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.target.closest('input, select, textarea')) return;
     if ((event.key === 't' || event.key === 'T') && state.pager.hasPages) {
@@ -727,11 +755,9 @@ function initPad() {
 }
 
 async function boot() {
-  state.pager = createPager($('pages'), {
-    onPress: pressItem,
-    onIndex: rememberPage,
-    imageUrl: (remoteId, entityId, version) => `/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/image?v=${encodeURIComponent(version)}`,
-  });
+  const imageUrl = (remoteId, entityId, version) => `/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/image?v=${encodeURIComponent(version)}`;
+  state.pager = createPager($('pages'), { onPress: pressItem, onIndex: rememberPage, imageUrl, onOpenPlayer: openPlayer });
+  state.player = createPlayer($('player'), { onCommand: playerCommand, imageUrl });
   initLogin();
   initViewSwitch();
   initPad();

@@ -18,6 +18,9 @@ every remote's status live.
   current value, all updated live. ucweb draws every icon itself in the current theme, picked from what the button
   does (the input it selects, the app it opens, the command it sends), so a page looks the same in every theme.
   Apps are shown by name, never by logo. The last page you looked at is remembered for each activity.
+- **Player**: tap a media widget for the full player: large artwork, title, artist and album, a seek bar, play and
+  pause, previous, next, stop, shuffle, repeat and volume. It offers only the controls that player reports it
+  supports, and the server checks every command against that list before sending it.
 - **Live status**: connection, battery level and charging, power supply, power mode (awake, idle, low power,
   asleep) and the device's model and firmware, updated as they change.
 - **Several remotes**: switch between them at the top of the page.
@@ -26,16 +29,16 @@ every remote's status live.
   Graphite & Brass, Brookwood and Brookwood Light. Each browser keeps its own choice.
 
 ucweb only controls. It never changes a remote's configuration: use the remote's web configurator for that.
-Select widgets, numpad items and the full player view are not built yet
-([#13](https://github.com/guyp2k/ucweb/issues/13), [#14](https://github.com/guyp2k/ucweb/issues/14),
-[#15](https://github.com/guyp2k/ucweb/issues/15)).
+Select widgets show their current option but can't change it, and numpad items are not drawn: no page on the
+remotes this was built against uses either.
 
 ## How it works
 
 A small Node server holds one API key per remote, keeps a live WebSocket connection to each remote's Core API,
 and serves the web app. The browser talks only to ucweb, never to the remotes, so the keys never leave the
-server. The server sends only four kinds of command: start or stop an activity, press a button that the activity maps, press
-an item on one of the activity's pages, and reboot or power off the remote. It looks the command up itself, so a browser can only name a button or
+server. The server sends only five kinds of command: start or stop an activity, press a button that the activity maps, press
+an item on one of the activity's pages, drive a media player shown on an open page (only the controls it reports),
+and reboot or power off the remote. It looks the command up itself, so a browser can only name a button or
 a page item, never send an arbitrary command to your devices. Album art is fetched by the server from the address
 the player reports, without the API key, and only image types are passed on.
 
