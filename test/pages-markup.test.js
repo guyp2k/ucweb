@@ -60,3 +60,12 @@ test('button labels, app names, sensor values and select values share one type s
   assert.equal(tiles['justify-content'], 'center');
   assert.equal(rule('.sensor-value')['justify-content'], 'center');
 });
+
+test('every panel on the main page has a titled section head', async () => {
+  const html = await readFile(path.join(publicDir, 'index.html'), 'utf8');
+  const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  const sections = [...main.matchAll(/<section class="section[^"]*"[^>]*aria-labelledby="([a-z-]+)"[^>]*>\s*<header class="section-head">\s*<h2 class="section-title" id="([a-z-]+)">([^<]+)<\/h2>/g)];
+  assert.deepEqual(sections.map(([, labelledBy, id, title]) => [labelledBy === id, title]), [[true, 'Status'], [true, 'Activities'], [true, 'Control'], [true, 'Remote']]);
+  assert.equal((main.match(/<section\b/g) ?? []).length, 4);
+  assert.match(main, /<div class="status" id="status" aria-live="polite"><\/div>/);
+});
