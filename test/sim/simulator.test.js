@@ -24,6 +24,7 @@ let base;
 let cookie;
 let watch;
 let target;
+let page;
 
 async function sim(method, pathname, body) {
   const headers = { authorization: SIM_AUTH, accept: 'application/json' };
@@ -139,6 +140,48 @@ test('a mapped button runs its command on the remote', async () => {
   assert.equal(response.status, 200);
   await waitFor(async () => (await simActivity(target)).attributes.state === 'ON', { timeoutMs: 10000, message: 'button started the target activity' });
   await waitFor(() => ucwebActivity(target)?.state === 'ON', { timeoutMs: 10000, message: 'ucweb saw the target ON live' });
+});
+
+test('activity pages made on the remote are served with their items and widget states', async () => {
+  page = (await sim('POST', `/api/activities/${watch}/ui/pages`, {
+    name: `${RUN} page`,
+    items: [
+      { type: 'text', text: 'Stop target', command: { entity_id: target, cmd_id: 'activity.off' }, location: { x: 0, y: 0 }, size: { width: 2, height: 1 } },
+      { type: 'icon', icon: 'uc:gear', location: { x: 2, y: 0 } },
+    ],
+  })).page_id;
+  const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/pages`);
+  assert.equal(response.status, 200);
+  const { pages, entities } = await response.json();
+  const made = pages.find((candidate) => candidate.id === page);
+  assert.equal(made.name, `${RUN} page`);
+  assert.deepEqual(made.grid, (await sim('GET', `/api/activities/${watch}/ui/pages/${page}`)).grid);
+  assert.deepEqual(made.items.map((item) => [item.index, item.type, item.text, item.icon, item.action]), [
+    [0, 'text', 'Stop target', null, true],
+    [1, 'icon', null, 'uc:gear', false],
+  ]);
+  assert.deepEqual(entities, {});
+});
+
+test('a page button runs the command the page stores on the remote', async () => {
+  const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/pages/${page}/items/0`, { method: 'POST', body: '{}' });
+  assert.equal(response.status, 200);
+  await waitFor(async () => (await simActivity(target)).attributes.state === 'OFF', { timeoutMs: 10000, message: 'the page button stopped the target' });
+  assert.equal((await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/pages/${page}/items/1`, { method: 'POST', body: '{}' })).status, 409);
+});
+
+test('editing a page on the remote reaches ucweb live', async () => {
+  const announced = [];
+  const listener = (activityId) => announced.push(activityId);
+  remote.on('pages', listener);
+  try {
+    await sim('PATCH', `/api/activities/${watch}/ui/pages/${page}`, { name: `${RUN} renamed page` });
+    await waitFor(() => announced.includes(watch), { timeoutMs: 10000, message: 'ucweb heard the page edit' });
+  } finally {
+    remote.off('pages', listener);
+  }
+  const { pages } = await (await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/pages`)).json();
+  assert.equal(pages.find((candidate) => candidate.id === page).name, `${RUN} renamed page`);
 });
 
 test('an unmapped button is refused before it reaches the remote', async () => {

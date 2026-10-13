@@ -24,7 +24,23 @@ before(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'ucweb-server-'));
   await writeFile(path.join(dir, `${HOSTNAME}.key`), KEY);
   await writeFile(path.join(dir, 'pin.hash'), await hashPin(PIN));
-  fake = await startFakeRemote({ buttonMappings: { 'act.tv': mapping('media.tv') } });
+  fake = await startFakeRemote({
+    buttonMappings: { 'act.tv': mapping('media.tv') },
+    uis: {
+      'act.tv': {
+        pages: [{
+          page_id: 'main',
+          name: 'Main',
+          grid: { width: 4, height: 6 },
+          items: [
+            { type: 'text', text: 'Input', command: { entity_id: 'media.tv', cmd_id: 'media_player.select_source', params: { source: 'HDMI 1' } }, location: { x: 0, y: 0 }, size: { width: 2, height: 1 } },
+            { type: 'sensor', sensor: { sensor_id: 'sensor.vol' }, location: { x: 2, y: 0 }, size: { width: 2, height: 1 } },
+          ],
+        }],
+      },
+    },
+    entities: { 'sensor.vol': { entity_id: 'sensor.vol', entity_type: 'sensor', name: { en: 'Volume' }, attributes: { state: 'ON', value: '30', unit: 'dB' } } },
+  });
   remote = new Remote({ address: fake.address, keysDir: dir, reconnectDelays: [20] });
   remote.start();
   await waitFor(() => remote.snapshot().online, { message: 'online' });
@@ -130,6 +146,51 @@ test('a button press is forwarded to the mapped entity', async () => {
   const response = await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/buttons/VOLUME_UP`, { method: 'POST', body: '{}' });
   assert.equal(response.status, 200);
   assert.deepEqual(fake.state.commands, [{ entityId: 'media.tv', body: { cmd_id: 'media_player.volume_up' } }]);
+});
+
+test('a signed-in browser gets an activity\'s pages with the state of their widgets', async () => {
+  const response = await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages`);
+  assert.equal(response.status, 200);
+  const { pages, entities } = await response.json();
+  assert.deepEqual(pages.map((page) => [page.id, page.name, page.items.length]), [['main', 'Main', 2]]);
+  assert.equal(pages[0].items[0].action, true);
+  assert.equal(JSON.stringify(pages).includes('select_source'), false);
+  assert.deepEqual(entities['sensor.vol'], { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', value: '30', unit: 'dB' });
+});
+
+test('a page item press runs the command the page stores', async () => {
+  fake.state.commands.length = 0;
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages/main/items`;
+  assert.equal((await authed(`${route}/0`, { method: 'POST', body: '{}' })).status, 200);
+  assert.deepEqual(fake.state.commands, [{ entityId: 'media.tv', body: { cmd_id: 'media_player.select_source', params: { source: 'HDMI 1' } } }]);
+});
+
+test('page item presses are refused without a session, from another site, or for items that do nothing', async () => {
+  fake.state.commands.length = 0;
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages/main/items`;
+  assert.equal((await fetch(`${base}${route}/0`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 401);
+  assert.equal((await authed(`${route}/0`, { method: 'POST', body: '{}', headers: { origin: 'http://evil.example' } })).status, 403);
+  assert.equal((await authed(`${route}/1`, { method: 'POST', body: '{}' })).status, 409);
+  assert.equal((await authed(`${route}/-1`, { method: 'POST', body: '{}' })).status, 400);
+  assert.equal((await authed(`${route}/1e3`, { method: 'POST', body: '{}' })).status, 400);
+  assert.equal((await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages/other/items/0`, { method: 'POST', body: '{}' })).status, 404);
+  assert.deepEqual(fake.state.commands, []);
+});
+
+test('artwork is only served for a player on an open page', async () => {
+  assert.equal((await authed(`/api/remotes/${encodeURIComponent(fake.address)}/entities/media.tv/image`)).status, 404);
+});
+
+test('live widget changes and page edits reach the browser', async (t) => {
+  await authed(`/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/pages`);
+  const { socket, messages } = await openEvents({ cookie, origin: base });
+  t.after(() => socket.terminate());
+  fake.emit('entity_change', { entity_type: 'sensor', entity_id: 'sensor.vol', event_type: 'CHANGE', new_state: { attributes: { value: '35' } } });
+  const entity = await waitFor(() => messages.find((message) => message.type === 'entity'), { message: 'entity message' });
+  assert.deepEqual(entity, { type: 'entity', remote: fake.address, entity: { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', value: '35', unit: 'dB' } });
+  fake.emit('entity_change', { entity_type: 'activity', entity_id: 'act.tv', event_type: 'CHANGE', new_state: { name: { en: 'Watch TV' }, attributes: { state: 'OFF' } } });
+  const pages = await waitFor(() => messages.find((message) => message.type === 'pages'), { message: 'pages message' });
+  assert.deepEqual(pages, { type: 'pages', remote: fake.address, activity: 'act.tv' });
 });
 
 test('turning an activity on needs a boolean', async () => {

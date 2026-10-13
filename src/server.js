@@ -67,6 +67,16 @@ function sendJson(res, status, body, headers = {}) {
   res.end(JSON.stringify(body));
 }
 
+function sendImage(res, image, cacheControl) {
+  res.writeHead(200, {
+    ...SECURITY_HEADERS,
+    'content-type': image.type,
+    'content-length': image.body.length,
+    'cache-control': cacheControl,
+  });
+  res.end(image.body);
+}
+
 function sameOrigin(req) {
   const origin = req.headers.origin;
   if (!origin) return true;
@@ -171,11 +181,17 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
       await remote.systemCommand(command);
       return sendJson(res, 200, { ok: true });
     }
+    if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'image' && method === 'GET') {
+      return sendImage(res, await findRemote(parts[1]).mediaImage(parts[3]), 'private, max-age=86400');
+    }
     if (parts[0] === 'remotes' && parts[2] === 'activities' && parts.length >= 5) {
       const remote = findRemote(parts[1]);
       const activityId = parts[3];
       if (parts.length === 5 && parts[4] === 'buttons' && method === 'GET') {
         return sendJson(res, 200, await remote.buttons(activityId));
+      }
+      if (parts.length === 5 && parts[4] === 'pages' && method === 'GET') {
+        return sendJson(res, 200, await remote.pages(activityId));
       }
       if (method !== 'POST') throw new HttpError(405, `${method} is not allowed here.`);
       if (!sameOrigin(req)) throw new HttpError(403, 'Cross-site requests are not allowed.');
@@ -187,6 +203,11 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
       }
       if (parts.length === 6 && parts[4] === 'buttons') {
         await remote.press(activityId, parts[5]);
+        return sendJson(res, 200, { ok: true });
+      }
+      if (parts.length === 8 && parts[4] === 'pages' && parts[6] === 'items') {
+        if (!/^\d{1,4}$/.test(parts[7])) throw new HttpError(400, 'The item number is not valid.');
+        await remote.pressItem(activityId, parts[5], Number(parts[7]));
         return sendJson(res, 200, { ok: true });
       }
     }
@@ -238,13 +259,21 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
     sockets.handleUpgrade(req, socket, head, (client) => sockets.emit('connection', client, req));
   });
 
-  const broadcast = (snapshot) => {
-    const message = JSON.stringify({ type: 'remote', remote: snapshot });
+  const broadcast = (message) => {
+    const text = JSON.stringify(message);
     for (const client of sockets.clients) {
-      if (client.readyState === client.OPEN) client.send(message);
+      if (client.readyState === client.OPEN) client.send(text);
     }
   };
-  for (const remote of remotes) remote.on('change', broadcast);
+  const listeners = remotes.map((remote) => ({
+    remote,
+    change: (snapshot) => broadcast({ type: 'remote', remote: snapshot }),
+    entity: (entity) => broadcast({ type: 'entity', remote: remote.id, entity }),
+    pages: (activity) => broadcast({ type: 'pages', remote: remote.id, activity }),
+  }));
+  for (const { remote, ...events } of listeners) {
+    for (const [name, listener] of Object.entries(events)) remote.on(name, listener);
+  }
 
   const heartbeat = setInterval(() => {
     for (const client of sockets.clients) {
@@ -265,7 +294,9 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
   });
   server.on('close', () => {
     clearInterval(heartbeat);
-    for (const remote of remotes) remote.off('change', broadcast);
+    for (const { remote, ...events } of listeners) {
+      for (const [name, listener] of Object.entries(events)) remote.off(name, listener);
+    }
     for (const client of sockets.clients) client.terminate();
   });
 

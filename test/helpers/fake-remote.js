@@ -24,11 +24,15 @@ export function mapping(entityId) {
   ];
 }
 
-export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {} } = {}) {
+export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {} } = {}) {
   const state = {
     activities,
     buttonMappings,
     entities,
+    uis,
+    art,
+    uiRequests: 0,
+    artRequests: 0,
     entityRequests: 0,
     battery: { capacity: 80, status: 'DISCHARGING', power_supply: false },
     batteryError,
@@ -50,7 +54,22 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
     if (url.pathname === '/api/pub/version') {
       return send(res, 200, { model: 'UCR3', device_name: 'Test Den', hostname: `${HOSTNAME}.local`, core: '1.0', ui: '1.1', os: '2.0' });
     }
+    const artwork = url.pathname.match(/^\/art\/([^/]+)$/);
+    if (artwork) {
+      state.artRequests += 1;
+      state.artAuthorization = req.headers.authorization;
+      const found = state.art[decodeURIComponent(artwork[1])];
+      if (!found) return send(res, 404, { message: 'no art' });
+      res.writeHead(200, { 'content-type': found.type });
+      return res.end(found.body);
+    }
     if (req.headers.authorization !== `Bearer ${KEY}`) return send(res, 401, { code: 'UNAUTHORIZED', message: 'bad key' });
+    const ui = url.pathname.match(/^\/api\/activities\/([^/]+)\/ui$/);
+    if (ui && req.method === 'GET') {
+      state.uiRequests += 1;
+      const found = state.uis[decodeURIComponent(ui[1])];
+      return found ? send(res, 200, found) : send(res, 404, { message: 'no such activity' });
+    }
     if (url.pathname === '/api/activities' && req.method === 'GET') {
       const page = Number(url.searchParams.get('page') ?? 1);
       const limit = Number(url.searchParams.get('limit') ?? 10);
