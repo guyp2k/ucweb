@@ -442,7 +442,7 @@ function renderSectionMeta(remote) {
   const count = remote?.activities.length ?? 0;
   $('activities-meta').textContent = remote ? `${count} ${count === 1 ? 'activity' : 'activities'}` : '';
   $('control-meta').textContent = remote ? remote.name ?? remote.address : '';
-  $('system-meta').textContent = remote ? `Sent directly to ${remote.name ?? remote.address}` : '';
+  $('system-meta').textContent = remote ? remote.name ?? remote.address : '';
 }
 
 const SYSTEM_ACTIONS = {
@@ -454,15 +454,21 @@ const CONFIRM_MS = 4000;
 function disarmSystem() {
   clearTimeout(state.systemTimer);
   state.systemArmed = null;
-  for (const button of document.querySelectorAll('.system-button')) {
+  for (const button of document.querySelectorAll('.system-button[data-command]')) {
     button.classList.remove('is-armed');
     button.querySelector('.system-button-text').textContent = SYSTEM_ACTIONS[button.dataset.command].label;
   }
 }
 
 function renderSystem(remote) {
+  const configurator = $('system-configurator');
+  configurator.hidden = !remote;
+  if (remote) {
+    configurator.href = remote.configuratorUrl;
+    configurator.setAttribute('aria-label', `Open the web configurator for ${remote.name ?? remote.address}`);
+  }
   if (state.systemArmed && state.systemArmed.remoteId !== remote?.id) disarmSystem();
-  for (const button of document.querySelectorAll('.system-button')) {
+  for (const button of document.querySelectorAll('.system-button[data-command]')) {
     button.disabled = !remote?.online || state.systemBusy;
   }
 }
@@ -494,7 +500,7 @@ async function systemCommand(button) {
 }
 
 function initSystem() {
-  for (const button of document.querySelectorAll('.system-button')) {
+  for (const button of document.querySelectorAll('.system-button[data-command]')) {
     button.addEventListener('click', () => systemCommand(button));
   }
 }
