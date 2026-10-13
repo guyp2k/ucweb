@@ -106,6 +106,14 @@ test('the device, firmware, battery and power mode come from the simulator', asy
   assert.equal(snapshot.powerMode, power.mode);
 });
 
+test('the web configurator link opens the remote\'s configurator page', async () => {
+  const url = remote.snapshot().configuratorUrl;
+  assert.equal(url, `http://${SIM}/configurator/#/login`);
+  const response = await fetch(url);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /^text\/html/);
+});
+
 test('activities made on the remote are listed with their names and states', async () => {
   const remotes = await (await ucweb('/api/remotes')).json();
   const names = Object.fromEntries(remotes[0].activities.map((activity) => [activity.id, activity]));

@@ -95,6 +95,7 @@ export class Remote extends EventEmitter {
     this.#state = {
       id: address,
       address,
+      configuratorUrl: `http://${address}/configurator/#/login`,
       name: null,
       model: null,
       firmware: null,

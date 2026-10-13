@@ -37,6 +37,13 @@ test('localized names prefer English and fall back to any language', () => {
   assert.equal(localizedText(null), null);
 });
 
+test('each remote links to its own web configurator, even while offline', async () => {
+  await connect({}, { writeKey: false });
+  assert.equal(remote.snapshot().configuratorUrl, `http://${fake.address}/configurator/#/login`);
+  const other = new Remote({ address: '192.168.60.59', keysDir });
+  assert.equal(other.snapshot().configuratorUrl, 'http://192.168.60.59/configurator/#/login');
+});
+
 test('connecting loads the device, battery, power mode and activities', async () => {
   await connect();
   const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });

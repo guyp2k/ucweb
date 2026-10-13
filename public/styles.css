@@ -1091,6 +1091,10 @@ svg {
   transition: border-color 0.15s, background-color 0.15s, color 0.15s;
 }
 
+a.system-button {
+  text-decoration: none;
+}
+
 .system-button svg {
   width: 18px;
   height: 18px;
