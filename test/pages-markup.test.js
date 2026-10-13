@@ -31,3 +31,13 @@ test('page parts never reuse a class name the app shell styles', async () => {
   assert.ok(shell.has('page') && shell.size > 40, `read ${shell.size} shell classes`);
   assert.deepEqual([...made].filter((name) => shell.has(name)), []);
 });
+
+test('each view switch tab controls a panel that exists, and each view hides the other panel', async () => {
+  const html = await readFile(path.join(publicDir, 'index.html'), 'utf8');
+  const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
+  const tabs = [...html.matchAll(/role="tab" data-view="([a-z]+)" aria-controls="([a-z]+)"/g)].map(([, view, panel]) => ({ view, panel }));
+  assert.deepEqual(tabs, [{ view: 'pages', panel: 'pages' }, { view: 'controls', panel: 'pad' }]);
+  for (const { panel } of tabs) assert.match(html, new RegExp(`id="${panel}" role="tabpanel"`), panel);
+  const hiding = css.match(/\.control-panel\[data-view="pages"\] \.pad,\s*\.control-panel\[data-view="controls"\] \.pages \{\s*display: none;/);
+  assert.ok(hiding, 'pages view hides the pad and controls view hides the pages');
+});

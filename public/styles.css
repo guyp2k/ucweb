@@ -888,7 +888,7 @@ svg {
 }
 
 .hint {
-  margin: 0;
+  margin: 18px 0 0;
   color: var(--muted);
   font-size: 0.72rem;
   text-align: center;
@@ -900,11 +900,94 @@ svg {
   }
 }
 
+.view-switch {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 400px;
+  margin: 0 auto 18px;
+  padding: 3px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.view-switch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: var(--accent-fill);
+  box-shadow: 0 6px 16px -8px var(--glow);
+  transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.control-panel[data-view="controls"] .view-switch::before {
+  transform: translateX(100%);
+}
+
+.view-switch button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font-label);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: var(--label-tracking);
+  text-transform: var(--label-case, uppercase);
+  color: var(--muted);
+  transition: color 0.2s;
+}
+
+.view-switch button[aria-selected="true"] {
+  color: var(--on-accent);
+}
+
+.view-switch button:hover:not([aria-selected="true"]) {
+  color: var(--text);
+}
+
+.view-switch button:focus-visible {
+  outline: 2px solid var(--accent-fill);
+  outline-offset: 2px;
+}
+
+.view-switch svg {
+  width: 16px;
+  height: 16px;
+}
+
+.control-panel[data-view="pages"] .pad,
+.control-panel[data-view="controls"] .pages {
+  display: none;
+}
+
+.control-panel.is-switching .pages,
+.control-panel.is-switching .pad {
+  animation: view-in 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
 .pages {
   --page-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --page-speed: 460ms;
   --page-gap: 8px;
-  margin: 0 auto 22px;
+  margin: 0 auto;
   max-width: 400px;
   user-select: none;
   -webkit-user-select: none;
@@ -1577,6 +1660,15 @@ svg {
 
   .media-fill {
     transition: none;
+  }
+
+  .view-switch::before {
+    transition: none;
+  }
+
+  .control-panel.is-switching .pages,
+  .control-panel.is-switching .pad {
+    animation-duration: 1ms;
   }
 }
 

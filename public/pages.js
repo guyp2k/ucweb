@@ -485,5 +485,5 @@ export function createPager(root, { onPress, onIndex, imageUrl }) {
     event.stopPropagation();
   }, true);
 
-  return { show, updateEntity, setEnabled, clear, step, get key() { return view.key; } };
+  return { show, updateEntity, setEnabled, clear, step, get key() { return view.key; }, get hasPages() { return view.pages.length > 0; } };
 }
