@@ -11,7 +11,8 @@ every remote's status live.
   use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. On a
   desktop the keyboard works too: arrows, Enter, Backspace, + and -, M and Space.
 - **Activity pages**: the pages you built for each activity in the web configurator, laid out on the same grid.
-  Swipe, use the arrows or dots, or press `[` and `]` to slide between them. A Pages | Controls switch (or `T` on a
+  Swipe, use the arrows or dots, or press `[` and `]` to slide between them; the home button beside the page name (or
+  `0`) slides back to the first page. A Pages | Controls switch (or `T` on a
   keyboard) flips between the pages and the control pad, and each browser remembers which one you use. The keyboard
   shortcuts for the pad work in both views. Buttons send exactly the command the
   page stores. Media widgets show artwork, title, artist and live progress, and sensor and select widgets show their

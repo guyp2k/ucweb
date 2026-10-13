@@ -1041,6 +1041,58 @@ svg {
   stroke-width: 2.2;
 }
 
+.pages-heading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.pages-home {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 0;
+  height: 30px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.6);
+  transition: width 320ms var(--page-ease), margin 320ms var(--page-ease), opacity 220ms, transform 320ms var(--page-ease), border-color 0.15s;
+}
+
+.pages-home.is-shown {
+  width: 30px;
+  margin-right: 10px;
+  border-color: color-mix(in srgb, var(--accent-fill) 55%, transparent);
+  background: color-mix(in srgb, var(--accent-fill) 14%, transparent);
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.pages-home.is-shown:hover {
+  border-color: var(--accent-fill);
+  background: color-mix(in srgb, var(--accent-fill) 24%, transparent);
+}
+
+.pages-home:focus-visible {
+  outline: 2px solid var(--accent-fill);
+  outline-offset: 2px;
+}
+
+.pages-home-icon {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
 .pages-title {
   display: flex;
   align-items: baseline;
@@ -1350,11 +1402,11 @@ svg {
 .page-app-name {
   display: -webkit-box;
   overflow: hidden;
-  font-family: var(--font-display);
-  font-size: clamp(0.62rem, 15cqmin, 1rem);
-  font-weight: var(--display-weight);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
+  font-family: var(--font-label);
+  font-size: clamp(0.78rem, 19cqmin, 1rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -1380,47 +1432,46 @@ svg {
 
 .page-sensor,
 .page-select {
-  align-items: flex-start;
   justify-content: center;
-  gap: 2px;
-  padding: 8px 12px;
+  gap: 3px;
+  padding: 6px 8px;
   border: 1px solid var(--hairline);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
-  text-align: left;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--text) 3%, transparent), transparent 60%),
+    color-mix(in srgb, var(--surface) 70%, transparent);
+  text-align: center;
 }
 
 .sensor-value {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  justify-content: center;
+  gap: 3px;
   max-width: 100%;
   min-width: 0;
 }
 
-.sensor-number {
-  overflow: hidden;
-  font-family: var(--font-display);
-  font-size: clamp(0.9rem, 30cqmin, 1.9rem);
-  font-weight: var(--display-weight);
-  line-height: 1.05;
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sensor-number.is-text-value {
+.sensor-number,
+.select-value {
   display: -webkit-box;
-  font-size: clamp(0.85rem, 15cqmin, 1.2rem);
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(--font-label);
+  font-size: clamp(0.78rem, 19cqmin, 1rem);
+  font-weight: 600;
   line-height: 1.15;
-  white-space: normal;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .sensor-unit {
+  flex: none;
   font-family: var(--font-label);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--muted);
 }
 
@@ -1428,23 +1479,13 @@ svg {
   max-width: 100%;
   overflow: hidden;
   font-family: var(--font-label);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 500;
   letter-spacing: var(--label-tracking);
   text-transform: var(--label-case, uppercase);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-}
-
-.select-value {
-  max-width: 100%;
-  overflow: hidden;
-  font-family: var(--font-display);
-  font-size: clamp(0.85rem, 26cqmin, 1.2rem);
-  font-weight: var(--display-weight);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .page-sensor.is-unavailable .sensor-number,

@@ -54,8 +54,15 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
   next.type = 'button';
   next.setAttribute('aria-label', 'Next page');
   next.append(icon('angle-right', 'pages-step-icon'));
+  const home = el('button', 'pages-home');
+  home.type = 'button';
+  home.setAttribute('aria-label', 'Back to the first page');
+  home.title = 'First page';
+  home.append(icon('house', 'pages-home-icon'));
+  const heading = el('div', 'pages-heading');
+  heading.append(home, title);
   const bar = el('div', 'pages-bar');
-  bar.append(prev, title, next);
+  bar.append(prev, heading, next);
   const viewport = el('div', 'pages-viewport');
   viewport.tabIndex = 0;
   viewport.setAttribute('role', 'region');
@@ -94,6 +101,9 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
       title.classList.add(direction > 0 ? 'is-from-right' : 'is-from-left');
     }
     prev.disabled = view.index === 0;
+    home.classList.toggle('is-shown', view.index > 0);
+    home.tabIndex = view.index > 0 ? 0 : -1;
+    home.setAttribute('aria-hidden', String(view.index === 0));
     next.disabled = view.index >= total - 1;
     bar.classList.toggle('is-single', total < 2);
     dots.hidden = total < 2;
@@ -303,12 +313,10 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
     const unavailable = !entity || entity.state === 'UNAVAILABLE';
     node.classList.toggle('is-unavailable', unavailable);
     const value = el('span', 'sensor-value');
-    const number = el('span', 'sensor-number', entity?.value ?? 'n/a');
-    if (!/^[-+]?\d+([.,]\d+)?$/.test(String(entity?.value ?? '').trim())) number.classList.add('is-text-value');
-    value.append(number);
-    if (item.showUnit && entity?.unit) value.append(el('span', 'sensor-unit', entity.unit));
+    value.append(el('span', 'sensor-number', unavailable ? 'Unavailable' : entity.value ?? 'n/a'));
+    if (!unavailable && item.showUnit && entity.unit) value.append(el('span', 'sensor-unit', entity.unit));
     const children = [value];
-    const label = unavailable ? 'Unavailable' : widgetLabel(item, entity);
+    const label = widgetLabel(item, entity);
     if (label) children.push(el('span', 'sensor-label', label));
     node.replaceChildren(...children);
     node.title = entity ? `${entity.name}${unavailable ? ' is unavailable' : ''}` : 'This sensor is no longer on the remote.';
@@ -483,6 +491,9 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
   }
 
   prev.addEventListener('click', () => step(-1));
+  home.addEventListener('click', () => {
+    if (view.index > 0) go(0);
+  });
   next.addEventListener('click', () => step(1));
 
   viewport.addEventListener('keydown', (event) => {
@@ -565,6 +576,7 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
     setEnabled,
     clear,
     step,
+    home: () => view.index > 0 && go(0),
     media: (entityId) => view.media.get(entityId) ?? null,
     get key() { return view.key; },
     get hasPages() { return view.pages.length > 0; },

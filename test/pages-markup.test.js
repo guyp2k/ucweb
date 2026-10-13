@@ -41,3 +41,22 @@ test('each view switch tab controls a panel that exists, and each view hides the
   const hiding = css.match(/\.control-panel\[data-view="pages"\] \.pad,\s*\.control-panel\[data-view="controls"\] \.pages \{\s*display: none;/);
   assert.ok(hiding, 'pages view hides the pad and controls view hides the pages');
 });
+
+test('button labels, app names, sensor values and select values share one type scale and are centered', async () => {
+  const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
+  const rule = (selector) => {
+    const match = css.match(new RegExp(`(?:^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:,[^{]*)? \\{([^}]*)\\}`));
+    assert.ok(match, `${selector} has a rule`);
+    return Object.fromEntries(match[1].split(';').map((line) => line.split(':').map((part) => part.trim())).filter(([key]) => key));
+  };
+  const scale = (selector) => {
+    const { 'font-family': family, 'font-size': size, 'font-weight': weight } = rule(selector);
+    return { family, size, weight };
+  };
+  const label = scale('.page-key-text');
+  for (const selector of ['.page-app-name', '.sensor-number']) assert.deepEqual(scale(selector), label, selector);
+  const tiles = rule('.page-sensor');
+  assert.equal(tiles['text-align'], 'center');
+  assert.equal(tiles['justify-content'], 'center');
+  assert.equal(rule('.sensor-value')['justify-content'], 'center');
+});
