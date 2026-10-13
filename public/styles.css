@@ -378,10 +378,13 @@ svg {
   padding: 20px max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
 }
 
+.status-section {
+  margin-bottom: 28px;
+}
+
 .status {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-bottom: 28px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   background: var(--surface-glass);

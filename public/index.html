@@ -77,7 +77,13 @@
   <div class="banner" id="banner" hidden></div>
 
   <main class="page" id="app" hidden>
-    <section class="status" id="status" aria-live="polite"></section>
+    <section class="section status-section" aria-labelledby="status-title">
+      <header class="section-head">
+        <h2 class="section-title" id="status-title">Status</h2>
+        <span class="section-meta" id="status-meta"></span>
+      </header>
+      <div class="status" id="status" aria-live="polite"></div>
+    </section>
 
     <div class="layout">
       <section class="section activities" aria-labelledby="activities-title">

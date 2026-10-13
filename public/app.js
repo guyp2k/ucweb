@@ -658,6 +658,7 @@ function renderControl(remote) {
 function renderSectionMeta(remote) {
   const count = remote?.activities.length ?? 0;
   $('activities-meta').textContent = remote ? `${count} ${count === 1 ? 'activity' : 'activities'}` : '';
+  $('status-meta').textContent = remote ? remote.name ?? remote.address : '';
   $('control-meta').textContent = remote ? remote.name ?? remote.address : '';
   $('system-meta').textContent = remote ? remote.name ?? remote.address : '';
 }
