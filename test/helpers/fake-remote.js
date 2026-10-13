@@ -24,7 +24,7 @@ export function mapping(entityId) {
   ];
 }
 
-export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {} } = {}) {
+export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {}, deviceName = 'Test Den' } = {}) {
   const state = {
     activities,
     buttonMappings,
@@ -54,7 +54,7 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://fake');
     if (url.pathname === '/api/pub/version') {
-      return send(res, 200, { model: 'UCR3', device_name: 'Test Den', hostname: `${HOSTNAME}.local`, core: '1.0', ui: '1.1', os: '2.0' });
+      return send(res, 200, { model: 'UCR3', device_name: deviceName, hostname: `${HOSTNAME}.local`, core: '1.0', ui: '1.1', os: '2.0' });
     }
     const artwork = url.pathname.match(/^\/art\/([^/]+)$/);
     if (artwork) {
