@@ -32,7 +32,7 @@ every remote's status live.
   asleep) and the device's model and firmware, updated as they change.
 - **Several remotes**: switch between them at the top of the page.
 - **PIN sign-in**: one PIN for the whole app, kept as a scrypt hash. A browser stays signed in for 30 days.
-- **Themes**: Miyara (the default), Original, Obsidian & Copper, Roon Dark, Roon Light, Dark Orange,
+- **Themes**: Miyara (the default), Pat's Blue, Original, Obsidian & Copper, Roon Dark, Roon Light, Dark Orange,
   Graphite & Brass, Brookwood and Brookwood Light. Each browser keeps its own choice.
 
 ucweb only controls. It never changes a remote's configuration: use the remote's web configurator for that.
@@ -110,7 +110,7 @@ Then open `http://<server>:8080/` and sign in. Run it again to change the PIN; t
 | `UCWEB_CONFIG_DIR` | `/config` | Holds `keys/`, `pin.hash` and `session.secret`. |
 | `UC_KEYS_DIR` | `$UCWEB_CONFIG_DIR/keys` | Where the `<hostname>.key` files are. |
 | `PORT` | `8080` | Port the web app listens on. |
-| `UCWEB_THEME` | `miyara` | Theme for browsers that have not picked one: `miyara`, `original`, `copper`, `roon`, `roon-light`, `dark-orange`, `graphite-brass`, `brookwood` or `brookwood-light`. |
+| `UCWEB_THEME` | `miyara` | Theme for browsers that have not picked one: `miyara`, `pats-blue`, `original`, `copper`, `roon`, `roon-light`, `dark-orange`, `graphite-brass`, `brookwood` or `brookwood-light`. |
 | `PUID` / `PGID` | `1000` | Owner of the config folder. The container fixes the folder's ownership at start and then drops root. Unraid uses 99 and 100. |
 
 ## Security

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
@@ -93,4 +93,17 @@ test('the battery meter takes its color from the battery level, not the warning 
   assert.doesNotMatch(css, /\.chip\.is-warn \.meter-fill/);
   const app = await readFile(path.join(publicDir, 'app.js'), 'utf8');
   assert.match(app, /fill\.style\.background = batteryFill\(remote\.battery\.capacity\);/);
+});
+
+test('the README and the Unraid template list every theme', async () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const ids = (await readdir(path.join(root, 'public', 'themes'), { withFileTypes: true })).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+  const readme = await readFile(path.join(root, 'README.md'), 'utf8');
+  const template = await readFile(path.join(root, 'unraid', 'ucweb.xml'), 'utf8');
+  const settingsRow = readme.split('\n').find((line) => line.startsWith('| `UCWEB_THEME`'));
+  const templateTheme = template.split('\n').find((line) => line.includes('Target="UCWEB_THEME"'));
+  for (const id of ids) {
+    assert.ok(settingsRow.includes(`\`${id}\``), `README settings row lists ${id}`);
+    assert.match(templateTheme, new RegExp(`[ "]${id}[,. ]`), `Unraid template lists ${id}`);
+  }
 });
