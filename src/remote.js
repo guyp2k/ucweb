@@ -24,6 +24,7 @@ const PLAYER_ACTIONS = {
   volume: { feature: 'volume', param: 'volume' },
   shuffle: { feature: 'shuffle', param: 'shuffle' },
   repeat: { feature: 'repeat', param: 'repeat' },
+  select_source: { feature: 'select_source', param: 'source' },
 };
 const PLAYER_FEATURES = [...new Set(Object.values(PLAYER_ACTIONS).map((action) => action.feature))];
 
@@ -180,6 +181,8 @@ export function toEntityView(watched, now = Date.now()) {
       muted: typeof attributes.muted === 'boolean' ? attributes.muted : null,
       shuffle: typeof attributes.shuffle === 'boolean' ? attributes.shuffle : null,
       repeat: REPEAT_MODES.has(attributes.repeat) ? attributes.repeat : null,
+      source: typeof attributes.source === 'string' && attributes.source ? attributes.source : null,
+      sources: (watched.features ?? []).includes('select_source') ? sourceList(attributes) : [],
     });
   } else if (watched.entity_type === 'sensor') {
     const unit = attributes.unit ?? watched.options?.custom_unit;
@@ -189,6 +192,10 @@ export function toEntityView(watched, now = Date.now()) {
     view.option = typeof attributes.current_option === 'string' && attributes.current_option ? attributes.current_option : null;
   }
   return view;
+}
+
+function sourceList(attributes) {
+  return Array.isArray(attributes.source_list) ? attributes.source_list.filter((source) => typeof source === 'string' && source) : [];
 }
 
 function toWatched(entity, now) {
@@ -408,6 +415,11 @@ export class Remote extends EventEmitter {
     } else if (action === 'repeat') {
       if (!REPEAT_MODES.has(value)) throw new HttpError(400, 'Send repeat as OFF, ALL or ONE.');
       params = { repeat: value };
+    } else if (action === 'select_source') {
+      if (typeof value !== 'string' || !sourceList(watched.attributes).includes(value)) {
+        throw new HttpError(400, `${name} has no source called ${JSON.stringify(value)}.`);
+      }
+      params = { source: value };
     }
     await this.#command({ entityId, cmdId: `media_player.${action}`, params });
   }

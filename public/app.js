@@ -1,5 +1,6 @@
 import { batteryFill } from './battery.js';
 import { createPager } from './pages.js';
+import { createChooser } from './chooser.js';
 import { createPlayer } from './player.js';
 
 const $ = (id) => document.getElementById(id);
@@ -45,6 +46,7 @@ const state = {
   pagesKey: null,
   pager: null,
   player: null,
+  chooser: null,
   view: 'pages',
   socket: null,
   socketAttempts: 0,
@@ -109,7 +111,7 @@ async function api(path, options = {}) {
 let toastTimer = null;
 function toast(message) {
   const node = $('toast');
-  const host = $('player').open ? $('player') : document.body;
+  const host = ['chooser', 'player'].map($).find((dialog) => dialog.open) ?? document.body;
   if (node.parentElement !== host) host.append(node);
   node.textContent = message;
   node.hidden = false;
@@ -547,7 +549,18 @@ function openPlayer(entityId) {
   state.player.open(remote.id, media.entity, media.at);
 }
 
+async function chooseSource(remoteId, entityId) {
+  const entity = state.pager.media(entityId)?.entity;
+  if (!entity?.sources?.length) return;
+  const chosen = await state.chooser.choose({ heading: 'Source', detail: entity.name, options: entity.sources, current: entity.source });
+  if (chosen && chosen !== entity.source) await playerCommand(remoteId, entityId, 'select_source', chosen);
+}
+
 async function playerCommand(remoteId, entityId, action, value) {
+  if (action === 'select_source' && value === undefined) {
+    await chooseSource(remoteId, entityId);
+    return;
+  }
   flashLogo();
   try {
     await api(`/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/player`, {
@@ -586,6 +599,7 @@ function renderControl(remote) {
     state.pagesKey = null;
     state.pager.clear();
     state.player.close();
+    state.chooser.close();
     applyView();
     const message = !remote?.online && remote
       ? `${remote.name ?? remote.address} is offline.`
@@ -730,7 +744,7 @@ function initPad() {
   pad.addEventListener('contextmenu', (event) => event.preventDefault());
 
   document.addEventListener('keydown', (event) => {
-    if (!$('login').hidden || $('pad').hidden || $('player').open) return;
+    if (!$('login').hidden || $('pad').hidden || $('player').open || $('chooser').open) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.target.closest('input, select, textarea')) return;
     if ((event.key === 't' || event.key === 'T') && state.pager.hasPages) {
@@ -756,7 +770,17 @@ function initPad() {
 
 async function boot() {
   const imageUrl = (remoteId, entityId, version) => `/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/image?v=${encodeURIComponent(version)}`;
-  state.pager = createPager($('pages'), { onPress: pressItem, onIndex: rememberPage, imageUrl, onOpenPlayer: openPlayer });
+  state.pager = createPager($('pages'), {
+    onPress: pressItem,
+    onIndex: rememberPage,
+    imageUrl,
+    onOpenPlayer: openPlayer,
+    onPlayer: (entityId, action, value) => {
+      const remote = currentRemote();
+      if (remote?.online) playerCommand(remote.id, entityId, action, value);
+    },
+  });
+  state.chooser = createChooser($('chooser'));
   state.player = createPlayer($('player'), { onCommand: playerCommand, imageUrl });
   initLogin();
   initViewSwitch();

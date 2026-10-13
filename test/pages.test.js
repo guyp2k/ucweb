@@ -41,7 +41,7 @@ const entities = {
     entity_type: 'media_player',
     name: { en: 'ES-DMP-A10' },
     features: ['on_off', 'play_pause', 'next', 'previous', 'seek', 'volume', 'volume_up_down', 'mute_toggle', 'media_title', 'select_source'],
-    attributes: { state: 'PLAYING', media_title: 'So What', media_artist: 'Miles Davis', media_album: 'Kind of Blue', media_duration: 545, media_position: 30, media_image_url: '', volume: 42, muted: false },
+    attributes: { state: 'PLAYING', media_title: 'So What', media_artist: 'Miles Davis', media_album: 'Kind of Blue', media_duration: 545, media_position: 30, media_image_url: '', volume: 42, muted: false, source: 'Internal player', source_list: ['Internal player', 'USB-B In', 'Bluetooth In'] },
   },
   'sensor.volume': { entity_id: 'sensor.volume', entity_type: 'sensor', name: { en: 'DMP Volume' }, options: { custom_unit: '%' }, attributes: { state: 'ON', value: '42' } },
   'select.output': { entity_id: 'select.output', entity_type: 'select', name: { en: 'Output' }, attributes: { state: 'ON', current_option: 'XLR', options: ['XLR', 'RCA'] } },
@@ -283,7 +283,9 @@ test('a player reports only the controls ucweb offers that it supports, with its
   await connect();
   const { entities: states } = await remote.pages('act.tv');
   const player = states['media.dmp'];
-  assert.deepEqual(player.features, ['play_pause', 'previous', 'next', 'volume_up_down', 'mute_toggle', 'seek', 'volume']);
+  assert.deepEqual(player.features, ['play_pause', 'previous', 'next', 'volume_up_down', 'mute_toggle', 'seek', 'volume', 'select_source']);
+  assert.equal(player.source, 'Internal player');
+  assert.deepEqual(player.sources, ['Internal player', 'USB-B In', 'Bluetooth In']);
   assert.equal(player.volume, 42);
   assert.equal(player.muted, false);
   assert.equal(player.shuffle, null);
@@ -352,4 +354,23 @@ test('unknown actions and players not on an open page are refused', async () => 
   }
   await assert.rejects(remote.playerCommand('sensor.volume', 'play_pause'), { status: 404 });
   assert.deepEqual(fake.state.commands, []);
+});
+
+test('a source can only be one the player lists', async () => {
+  await connect();
+  await remote.pages('act.tv');
+  for (const value of ['Optical In', '', undefined, 3, ['USB-B In']]) {
+    await assert.rejects(remote.playerCommand('media.dmp', 'select_source', value), { status: 400 }, String(value));
+  }
+  await remote.playerCommand('media.dmp', 'select_source', 'USB-B In');
+  assert.deepEqual(fake.state.commands, [{ entityId: 'media.dmp', body: { cmd_id: 'media_player.select_source', params: { source: 'USB-B In' } } }]);
+});
+
+test('a player that cannot select a source reports no sources and refuses one', async () => {
+  const players = structuredClone(entities);
+  players['media.dmp'].features = players['media.dmp'].features.filter((feature) => feature !== 'select_source');
+  await connect({ entities: players });
+  const { entities: states } = await remote.pages('act.tv');
+  assert.deepEqual(states['media.dmp'].sources, []);
+  await assert.rejects(remote.playerCommand('media.dmp', 'select_source', 'USB-B In'), { status: 409 });
 });

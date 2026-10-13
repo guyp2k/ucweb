@@ -79,6 +79,11 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
   repeat.append(repeatOne);
   const transport = el('div', 'player-transport');
   transport.append(shuffle, previous, playPause, next, stop, repeat);
+  const sourceButton = el('button', 'player-source-button');
+  sourceButton.type = 'button';
+  sourceButton.dataset.action = 'select_source';
+  const sourceText = el('span', 'player-source-text');
+  sourceButton.append(icon('devices'), sourceText);
 
   const mute = control('mute_toggle', 'Mute', 'mute', 'player-control player-small');
   const down = control('volume_down', 'Volume down', 'volume-down', 'player-control player-small');
@@ -95,7 +100,7 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
 
   const state = el('span', 'player-state');
   const sheet = el('div', 'player-sheet');
-  sheet.append(backdrop, grabber, close, art, state, meta, progress, transport, volume);
+  sheet.append(backdrop, grabber, close, art, state, meta, progress, transport, volume, sourceButton);
   dialog.replaceChildren(sheet);
 
   const current = { remoteId: null, entity: null, at: 0, imageKey: null, seeking: false, ticker: null, closing: null };
@@ -195,6 +200,8 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
     levelText.textContent = entity.volume === null ? '' : `${Math.round(entity.volume)}`;
     levelText.hidden = entity.volume === null;
     volume.hidden = mute.hidden && down.hidden && level.hidden;
+    sourceButton.hidden = !supports('select_source') || !(entity.sources?.length > 0);
+    sourceText.textContent = entity.source ? `Source: ${entity.source}` : 'Choose a source';
     paintProgress();
     clearInterval(current.ticker);
     current.ticker = playing ? setInterval(paintProgress, 1000) : null;
@@ -241,6 +248,7 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
     if (event.target === dialog) hide();
   });
   close.addEventListener('click', hide);
+  sourceButton.addEventListener('click', () => send('select_source'));
   transport.addEventListener('click', (event) => {
     const button = event.target.closest('[data-action]');
     if (!button || !current.entity) return;

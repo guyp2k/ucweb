@@ -18,8 +18,11 @@ every remote's status live.
   current value, all updated live. ucweb draws every icon itself in the current theme, picked from what the button
   does (the input it selects, the app it opens, the command it sends), so a page looks the same in every theme.
   Apps are shown by name, never by logo. The last page you looked at is remembered for each activity.
-- **Player**: tap a media widget for the full player: large artwork, title, artist and album, a seek bar, play and
-  pause, previous, next, stop, shuffle, repeat and volume. It offers only the controls that player reports it
+- **Media widgets** carry their own controls like the remote app: previous, play and pause, next, shuffle, repeat and
+  a source picker, each shown only when the player supports it. Library browsing is tracked in
+  [#19](https://github.com/guyp2k/ucweb/issues/19).
+- **Player**: tap a media widget's artwork for the full player: large artwork, title, artist and album, a seek bar, play and
+  pause, previous, next, stop, shuffle, repeat, volume and source. It offers only the controls that player reports it
   supports, and the server checks every command against that list before sending it.
 - **Live status**: connection, battery level and charging, power supply, power mode (awake, idle, low power,
   asleep) and the device's model and firmware, updated as they change.

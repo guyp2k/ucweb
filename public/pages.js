@@ -39,7 +39,9 @@ function clock(seconds) {
 
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer }) {
+const REPEAT_NEXT = { OFF: 'ALL', ALL: 'ONE', ONE: 'OFF' };
+
+export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, onPlayer }) {
   const title = el('div', 'pages-title');
   const name = el('h4', 'pages-name');
   const count = el('span', 'pages-count');
@@ -168,18 +170,71 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer }) 
     if (ticker === null && [...view.media.values()].some((entry) => entry.entity.state === 'PLAYING')) ticker = setInterval(tick, 1000);
   }
 
+  function mediaControl(entity, action, label, key, extra = '') {
+    const button = el('button', `media-control${extra}`);
+    button.type = 'button';
+    button.dataset.action = action;
+    button.disabled = !view.enabled;
+    button.setAttribute('aria-label', `${label}, ${entity.name}`);
+    button.title = label;
+    button.append(icon(key, 'media-control-icon'));
+    return button;
+  }
+
+  function mediaControls(entity) {
+    const supports = (feature) => entity.features?.includes(feature);
+    const playing = entity.state === 'PLAYING';
+    const transport = el('div', 'media-transport');
+    if (supports('previous')) transport.append(mediaControl(entity, 'previous', 'Previous', 'previous'));
+    if (supports('play_pause')) transport.append(mediaControl(entity, 'play_pause', playing ? 'Pause' : 'Play', playing ? 'pause' : 'play', ' media-main'));
+    if (supports('next')) transport.append(mediaControl(entity, 'next', 'Next', 'next'));
+    const extras = el('div', 'media-extras');
+    if (supports('shuffle')) {
+      const shuffle = mediaControl(entity, 'shuffle', 'Shuffle', 'shuffle', ' media-mode');
+      shuffle.classList.toggle('is-on', entity.shuffle === true);
+      shuffle.setAttribute('aria-pressed', String(entity.shuffle === true));
+      extras.append(shuffle);
+    }
+    if (supports('repeat')) {
+      const repeat = mediaControl(entity, 'repeat', 'Repeat', 'repeat', ' media-mode');
+      const on = entity.repeat === 'ALL' || entity.repeat === 'ONE';
+      repeat.classList.toggle('is-on', on);
+      repeat.setAttribute('aria-pressed', String(on));
+      if (entity.repeat === 'ONE') repeat.append(el('span', 'media-repeat-one', '1'));
+      extras.append(repeat);
+    }
+    if (supports('select_source') && entity.sources?.length > 0) {
+      const source = mediaControl(entity, 'select_source', entity.source ? `Source: ${entity.source}` : 'Choose a source', 'devices', ' media-mode');
+      extras.append(source);
+    }
+    const controls = el('div', 'media-controls');
+    if (transport.childElementCount > 0) controls.append(transport);
+    if (extras.childElementCount > 0) controls.append(extras);
+    if (controls.childElementCount === 0) return null;
+    controls.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const button = event.target.closest('[data-action]');
+      if (!button || button.disabled) return;
+      const current = view.media.get(entity.id)?.entity ?? entity;
+      button.classList.remove('is-sent');
+      void button.offsetWidth;
+      button.classList.add('is-sent');
+      const { action } = button.dataset;
+      if (action === 'shuffle') onPlayer?.(entity.id, action, current.shuffle !== true);
+      else if (action === 'repeat') onPlayer?.(entity.id, action, REPEAT_NEXT[current.repeat ?? 'OFF']);
+      else onPlayer?.(entity.id, action);
+    });
+    return controls;
+  }
+
   function fillMedia(node, entity) {
     node.classList.toggle('is-openable', Boolean(entity));
+    const art = el(entity ? 'button' : 'div', 'media-art');
     if (entity) {
-      node.tabIndex = 0;
-      node.setAttribute('role', 'button');
-      node.setAttribute('aria-label', `Open the player for ${entity.name}`);
-    } else {
-      node.removeAttribute('tabindex');
-      node.removeAttribute('role');
-      node.removeAttribute('aria-label');
+      art.type = 'button';
+      art.setAttribute('aria-label', `Open the player for ${entity.name}`);
+      art.title = 'Open the player';
     }
-    const art = el('div', 'media-art');
     const backdrop = el('div', 'media-backdrop');
     node.classList.toggle('is-unavailable', !entity || entity.state === 'UNAVAILABLE');
     if (!entity) {
@@ -229,6 +284,9 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer }) 
     progress.append(barEl, times);
     const body = el('div', 'media-body');
     body.append(art, meta, progress);
+    const controls = mediaControls(entity);
+    if (controls) body.append(controls);
+    node.classList.toggle('has-controls', Boolean(controls));
     node.replaceChildren(backdrop, body);
     if (playing) node.append(badge);
     node.classList.toggle('has-art', Boolean(hasArt));
@@ -317,15 +375,9 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer }) 
       node = el('div', `page-item ${WIDGET_CLASSES[item.type]}`);
       node.dataset.entity = item.entityId;
       if (item.type === 'media_player') {
-        const open = () => {
+        node.addEventListener('click', (event) => {
+          if (event.target.closest('.media-controls')) return;
           if (view.media.has(item.entityId)) onOpenPlayer?.(item.entityId);
-        };
-        node.addEventListener('click', open);
-        node.addEventListener('keydown', (event) => {
-          if (event.key !== 'Enter' && event.key !== ' ') return;
-          event.preventDefault();
-          event.stopPropagation();
-          open();
         });
       }
       fillWidget(node, item);
@@ -414,7 +466,7 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer }) 
 
   function setEnabled(enabled) {
     view.enabled = enabled;
-    for (const key of track.querySelectorAll('.page-key')) key.disabled = !enabled;
+    for (const key of track.querySelectorAll('.page-key, .media-control')) key.disabled = !enabled;
   }
 
   function clear() {
