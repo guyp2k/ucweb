@@ -10,6 +10,12 @@ every remote's status live.
   record. Each button sends exactly what the activity's own button mapping sends; buttons the activity does not
   use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. On a
   desktop the keyboard works too: arrows, Enter, Backspace, + and -, M and Space.
+- **Activity pages**: the pages you built for each activity in the web configurator, laid out on the same grid.
+  Swipe, use the arrows or dots, or press `[` and `]` to slide between them. Buttons send exactly the command the
+  page stores. Media widgets show artwork, title, artist and live progress, and sensor and select widgets show their
+  current value, all updated live. ucweb draws every icon itself in the current theme, picked from what the button
+  does (the input it selects, the app it opens, the command it sends), so a page looks the same in every theme.
+  Apps are shown by name, never by logo. The last page you looked at is remembered for each activity.
 - **Live status**: connection, battery level and charging, power supply, power mode (awake, idle, low power,
   asleep) and the device's model and firmware, updated as they change.
 - **Several remotes**: switch between them at the top of the page.
@@ -18,13 +24,18 @@ every remote's status live.
   Graphite & Brass, Brookwood and Brookwood Light. Each browser keeps its own choice.
 
 ucweb only controls. It never changes a remote's configuration: use the remote's web configurator for that.
+Select widgets, numpad items and the full player view are not built yet
+([#13](https://github.com/guyp2k/ucweb/issues/13), [#14](https://github.com/guyp2k/ucweb/issues/14),
+[#15](https://github.com/guyp2k/ucweb/issues/15)).
 
 ## How it works
 
 A small Node server holds one API key per remote, keeps a live WebSocket connection to each remote's Core API,
 and serves the web app. The browser talks only to ucweb, never to the remotes, so the keys never leave the
-server. The server sends only two kinds of command: start or stop an activity, and press a button that the
-activity maps. It looks the mapping up itself, so a browser cannot send arbitrary commands to your devices.
+server. The server sends only four kinds of command: start or stop an activity, press a button that the activity maps, press
+an item on one of the activity's pages, and reboot or power off the remote. It looks the command up itself, so a browser can only name a button or
+a page item, never send an arbitrary command to your devices. Album art is fetched by the server from the address
+the player reports, without the API key, and only image types are passed on.
 
 ## Install
 
@@ -133,6 +144,8 @@ use only and is never part of the ucweb image.
   follow the themes of [Rabbit Hole Fork](https://github.com/guyp2k/RabbitHole-Fork). Graphite & Brass follows
   [Rouen](https://github.com/meltface-80/Rouen).
 - Fonts are under the SIL Open Font License; each theme's `fonts/LICENSE.txt` lists them.
+- Most page icons follow the geometry of [Lucide](https://lucide.dev) (ISC License); the connector icons are drawn
+  for ucweb. See `public/icons.LICENSE.txt`.
 
 ucweb is an independent project and is not affiliated with or endorsed by Unfolded Circle.
 

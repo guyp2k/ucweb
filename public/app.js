@@ -1,8 +1,9 @@
 import { batteryFill } from './battery.js';
+import { createPager } from './pages.js';
 
 const $ = (id) => document.getElementById(id);
 
-const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote' };
+const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote', pages: 'ucweb.pages' };
 const REPEAT_DELAY_MS = 400;
 const REPEAT_EVERY_MS = 180;
 const RECONNECT_MS = [1000, 2000, 5000, 10000];
@@ -40,6 +41,8 @@ const state = {
   controlId: null,
   buttons: null,
   buttonsKey: null,
+  pagesKey: null,
+  pager: null,
   socket: null,
   socketAttempts: 0,
   reconnectTimer: null,
@@ -70,6 +73,22 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined && text !== null) node.textContent = text;
   return node;
+}
+
+function rememberedPages() {
+  try {
+    const saved = JSON.parse(load(STORAGE.pages) ?? '{}');
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function rememberPage(pageId) {
+  if (!state.pagesKey || !pageId) return;
+  const saved = rememberedPages();
+  saved[state.pagesKey] = pageId;
+  save(STORAGE.pages, JSON.stringify(saved));
 }
 
 async function api(path, options = {}) {
@@ -222,7 +241,9 @@ function connect() {
   });
   socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
+    let stalePages = false;
     if (message.type === 'snapshot') {
+      stalePages = true;
       if (state.version && message.version !== state.version) {
         location.reload();
         return;
@@ -233,9 +254,19 @@ function connect() {
       const saved = load(STORAGE.remote);
       if (!state.remotes.has(state.remoteId)) state.remoteId = state.remotes.has(saved) ? saved : state.order[0] ?? null;
     } else if (message.type === 'remote') {
+      const before = state.remotes.get(message.remote.id);
+      stalePages = Boolean(before && !before.online && message.remote.online);
       state.remotes.set(message.remote.id, message.remote);
+    } else if (message.type === 'entity') {
+      if (state.pagesKey?.startsWith(`${message.remote}\n`)) state.pager.updateEntity(message.entity);
+      return;
+    } else if (message.type === 'pages') {
+      if (state.pagesKey === `${message.remote}\n${message.activity}`) refreshPages();
+      return;
     }
+    const shownPages = state.pagesKey;
     render();
+    if (stalePages && shownPages && shownPages === state.pagesKey) refreshPages();
   });
   socket.addEventListener('close', async () => {
     if (state.socket !== socket) return;
@@ -418,6 +449,53 @@ async function loadButtons(remote, activity) {
   applyButtons();
 }
 
+const visiblePages = (pages) => pages.filter((page) => page.items.length > 0);
+
+async function loadPages(remote, activity, { force = false } = {}) {
+  const key = `${remote.id}\n${activity.id}`;
+  if (state.pagesKey === key && !force) return;
+  const fresh = state.pagesKey !== key;
+  state.pagesKey = key;
+  if (fresh) state.pager.clear();
+  try {
+    const data = await api(`/api/remotes/${encodeURIComponent(remote.id)}/activities/${encodeURIComponent(activity.id)}/pages`);
+    if (state.pagesKey !== key) return;
+    const pages = visiblePages(data.pages);
+    if (pages.length === 0) {
+      state.pager.clear();
+      return;
+    }
+    state.pager.show({ key, pages, entities: data.entities, pageId: rememberedPages()[key], remoteId: remote.id });
+    state.pager.setEnabled(Boolean(currentRemote()?.online));
+  } catch (error) {
+    if (state.pagesKey !== key) return;
+    state.pagesKey = null;
+    state.pager.clear();
+    toast(error.message);
+  }
+}
+
+function refreshPages() {
+  const remote = currentRemote();
+  const activity = controlledActivity(remote);
+  if (remote && activity && state.pagesKey === `${remote.id}\n${activity.id}`) loadPages(remote, activity, { force: true });
+}
+
+async function pressItem(pageId, index) {
+  const remote = currentRemote();
+  const activity = controlledActivity(remote);
+  if (!remote || !activity) return;
+  flashLogo();
+  try {
+    await api(
+      `/api/remotes/${encodeURIComponent(remote.id)}/activities/${encodeURIComponent(activity.id)}/pages/${encodeURIComponent(pageId)}/items/${index}`,
+      { method: 'POST', body: '{}' },
+    );
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 function renderControl(remote) {
   const activity = controlledActivity(remote);
   const head = $('control-head');
@@ -427,6 +505,8 @@ function renderControl(remote) {
   if (!activity || !remote?.online) {
     pad.hidden = true;
     state.buttonsKey = null;
+    state.pagesKey = null;
+    state.pager.clear();
     const message = !remote?.online && remote
       ? `${remote.name ?? remote.address} is offline.`
       : 'Nothing is running. Start an activity to use the controls.';
@@ -439,6 +519,8 @@ function renderControl(remote) {
   head.replaceChildren(title);
   pad.hidden = false;
   loadButtons(remote, activity);
+  loadPages(remote, activity);
+  state.pager.setEnabled(remote.online);
 }
 
 function renderSectionMeta(remote) {
@@ -570,6 +652,11 @@ function initPad() {
     if (!$('login').hidden || $('pad').hidden) return;
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     if (event.target.closest('input, select, textarea')) return;
+    if ((event.key === '[' || event.key === ']') && !$('pages').hidden) {
+      event.preventDefault();
+      state.pager.step(event.key === '[' ? -1 : 1);
+      return;
+    }
     if ((event.key === 'Enter' || event.key === ' ') && event.target.closest('button')) return;
     const button = KEYMAP[event.key];
     if (!button) return;
@@ -582,6 +669,11 @@ function initPad() {
 }
 
 async function boot() {
+  state.pager = createPager($('pages'), {
+    onPress: pressItem,
+    onIndex: rememberPage,
+    imageUrl: (remoteId, entityId, version) => `/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/image?v=${encodeURIComponent(version)}`,
+  });
   initLogin();
   initPad();
   initSystem();

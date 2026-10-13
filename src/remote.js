@@ -1,11 +1,16 @@
+import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import WebSocket from 'ws';
 
 const PAGE_SIZE = 100;
-const CHANNELS = ['entity_activity', 'battery_status'];
+const CHANNELS = ['entity_activity', 'entity_media_player', 'entity_sensor', 'entity_select', 'battery_status'];
+const WIDGET_ENTITY_TYPES = new Set(['media_player', 'sensor', 'select']);
 const SYSTEM_COMMANDS = new Set(['REBOOT', 'POWER_OFF']);
+const ITEM_TYPES = new Set(['text', 'icon', 'media_player', 'sensor', 'select']);
+const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -61,6 +66,145 @@ export function resolveButtons(buttonMapping, dpadDevice) {
   });
 }
 
+const whole = (value, min) => (Number.isInteger(value) && value >= min ? value : null);
+
+function iconHint(command) {
+  const source = command?.params?.source;
+  if (typeof source === 'string') return source.trim() || null;
+  return typeof command?.cmd_id === 'string' && command.cmd_id ? command.cmd_id : null;
+}
+
+function toItem(item, index) {
+  if (!item || !ITEM_TYPES.has(item.type)) return null;
+  const x = whole(item.location?.x, 0);
+  const y = whole(item.location?.y, 0);
+  if (x === null || y === null) return null;
+  const entityId = item.media_player_id ?? item.sensor?.sensor_id ?? item.select?.select_id ?? null;
+  if (WIDGET_ENTITY_TYPES.has(item.type) && !entityId) return null;
+  const text = typeof item.text === 'string' && item.text ? item.text : null;
+  const icon = typeof item.icon === 'string' && item.icon ? item.icon : null;
+  if (item.type === 'text' && !text) return null;
+  if (item.type === 'icon' && !icon) return null;
+  const view = {
+    index,
+    type: item.type,
+    x,
+    y,
+    width: whole(item.size?.width, 1) ?? 1,
+    height: whole(item.size?.height, 1) ?? 1,
+    text,
+    icon: item.type === 'icon' ? icon : null,
+    hint: item.type === 'icon' ? iconHint(item.command) : null,
+    action: (item.type === 'text' || item.type === 'icon') && Boolean(item.command?.entity_id && item.command?.cmd_id),
+    entityId: WIDGET_ENTITY_TYPES.has(item.type) ? entityId : null,
+  };
+  if (item.type === 'sensor') {
+    view.showLabel = item.sensor.show_label === true;
+    view.showUnit = item.sensor.show_unit !== false;
+  }
+  if (item.type === 'select') view.showLabel = item.select.show_name === true;
+  return view;
+}
+
+export function toPages(ui) {
+  const pages = [];
+  const commands = new Map();
+  const entityIds = new Set();
+  for (const page of Array.isArray(ui?.pages) ? ui.pages : []) {
+    const width = whole(page?.grid?.width, 1);
+    const height = whole(page?.grid?.height, 1);
+    if (typeof page?.page_id !== 'string' || !page.page_id || width === null || height === null) continue;
+    const items = [];
+    (Array.isArray(page.items) ? page.items : []).forEach((raw, index) => {
+      const item = toItem(raw, index);
+      if (!item) return;
+      items.push(item);
+      if (item.action) {
+        const { entity_id: entityId, cmd_id: cmdId, params } = raw.command;
+        commands.set(`${page.page_id}\n${index}`, { entityId, cmdId, params });
+      }
+      if (item.entityId) entityIds.add(item.entityId);
+    });
+    pages.push({ id: page.page_id, name: typeof page.name === 'string' && page.name ? page.name : null, grid: { width, height }, items });
+  }
+  return { pages, commands, entityIds: [...entityIds] };
+}
+
+const finite = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+
+function mediaPosition(watched, now) {
+  const attributes = watched.attributes;
+  const position = finite(attributes.media_position);
+  if (position === null) return null;
+  if (attributes.state !== 'PLAYING' || watched.positionAt === null) return position;
+  const moved = position + (now - watched.positionAt) / 1000;
+  const duration = finite(attributes.media_duration);
+  return duration !== null && duration > 0 ? Math.min(moved, duration) : moved;
+}
+
+export function toEntityView(watched, now = Date.now()) {
+  const attributes = watched.attributes ?? {};
+  const view = {
+    id: watched.entity_id,
+    type: watched.entity_type,
+    name: localizedText(watched.name) ?? watched.entity_id,
+    state: attributes.state ?? null,
+  };
+  if (watched.entity_type === 'media_player') {
+    const duration = finite(attributes.media_duration);
+    const image = typeof attributes.media_image_url === 'string' && attributes.media_image_url ? attributes.media_image_url : null;
+    Object.assign(view, {
+      title: attributes.media_title || null,
+      artist: attributes.media_artist || null,
+      album: attributes.media_album || null,
+      duration: duration !== null && duration > 0 ? duration : null,
+      position: mediaPosition(watched, now),
+      image: image ? createHash('sha256').update(image).digest('hex').slice(0, 16) : null,
+    });
+  } else if (watched.entity_type === 'sensor') {
+    const unit = attributes.unit ?? watched.options?.custom_unit;
+    view.value = attributes.value === undefined || attributes.value === null ? null : String(attributes.value);
+    view.unit = typeof unit === 'string' && unit ? unit : null;
+  } else if (watched.entity_type === 'select') {
+    view.option = typeof attributes.current_option === 'string' && attributes.current_option ? attributes.current_option : null;
+  }
+  return view;
+}
+
+function toWatched(entity, now) {
+  return {
+    entity_id: entity.entity_id,
+    entity_type: entity.entity_type,
+    name: entity.name,
+    options: entity.options ?? null,
+    attributes: { ...entity.attributes },
+    positionAt: finite(entity.attributes?.media_position) === null ? null : now,
+  };
+}
+
+function imageType(contentType) {
+  const type = String(contentType ?? '').split(';')[0].trim().toLowerCase();
+  return IMAGE_TYPES.has(type) ? type : null;
+}
+
+async function readCapped(response, limit) {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > limit) throw new HttpError(502, 'The image is too large.');
+  const chunks = [];
+  let size = 0;
+  try {
+    for await (const chunk of response.body) {
+      size += chunk.length;
+      if (size > limit) throw new HttpError(502, 'The image is too large.');
+      chunks.push(chunk);
+    }
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(504, `The image stopped arriving (${error.cause?.code ?? error.name}).`);
+  }
+  return Buffer.concat(chunks);
+}
+
 export class Remote extends EventEmitter {
   #address;
   #keysDir;
@@ -75,6 +219,9 @@ export class Remote extends EventEmitter {
   #key = null;
   #requestId = 0;
   #mappings = new Map();
+  #uis = new Map();
+  #watched = new Map();
+  #images = new Map();
   #state;
 
   constructor({
@@ -156,9 +303,85 @@ export class Remote extends EventEmitter {
     const entry = (await this.#mapping(activityId)).find((candidate) => candidate.button === button);
     if (!entry) throw new HttpError(404, `${activity.name} has no ${button} button.`);
     if (!entry.command) throw new HttpError(409, `${button} does nothing in ${activity.name}.`);
-    const { entityId, cmdId, params } = entry.command;
+    await this.#command(entry.command);
+  }
+
+  async pages(activityId) {
+    const ui = await this.#ui(activityId);
+    const now = Date.now();
+    const entities = {};
+    await Promise.all(ui.entityIds.map(async (entityId) => {
+      const entity = await this.#entity(entityId);
+      if (entity && WIDGET_ENTITY_TYPES.has(entity.entity_type)) {
+        this.#watched.set(entityId, toWatched(entity, now));
+        entities[entityId] = toEntityView(this.#watched.get(entityId), now);
+      } else {
+        this.#watched.delete(entityId);
+      }
+    }));
+    return { pages: ui.pages, entities };
+  }
+
+  async pressItem(activityId, pageId, index) {
+    const activity = this.#requireActivity(activityId);
+    const ui = await this.#ui(activityId);
+    const page = ui.pages.find((candidate) => candidate.id === pageId);
+    if (!page) throw new HttpError(404, `${activity.name} has no page ${pageId}.`);
+    const command = ui.commands.get(`${pageId}\n${index}`);
+    if (!command) throw new HttpError(409, `That item on ${page.name ?? 'this page'} does nothing.`);
+    await this.#command(command);
+  }
+
+  async mediaImage(entityId) {
+    const watched = this.#watched.get(entityId);
+    if (!watched || watched.entity_type !== 'media_player') throw new HttpError(404, 'That player is not on a page that is open.');
+    const url = watched.attributes.media_image_url;
+    if (typeof url !== 'string' || !url) throw new HttpError(404, 'Nothing is showing on that player.');
+    const cached = this.#images.get(entityId);
+    if (cached?.url === url) return cached;
+    let image;
+    const inline = url.match(/^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (inline) {
+      const type = imageType(inline[1]);
+      if (!type) throw new HttpError(502, 'The player\'s artwork is in a format ucweb does not show.');
+      image = { url, type, body: Buffer.from(inline[2], 'base64') };
+    } else {
+      let parsed;
+      try {
+        parsed = new URL(url);
+      } catch {
+        throw new HttpError(502, 'The player\'s artwork address is not valid.');
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new HttpError(502, 'The player\'s artwork address is not a web address.');
+      const response = await this.#fetchArtwork(parsed.href);
+      if (!response.ok) throw new HttpError(502, `The player's artwork answered HTTP ${response.status}.`);
+      const type = imageType(response.headers.get('content-type'));
+      if (!type) throw new HttpError(502, 'The player\'s artwork is in a format ucweb does not show.');
+      image = { url, type, body: await readCapped(response, MAX_IMAGE_BYTES) };
+    }
+    if (image.body.length > MAX_IMAGE_BYTES) throw new HttpError(502, 'The image is too large.');
+    this.#images.set(entityId, image);
+    return image;
+  }
+
+  async #command({ entityId, cmdId, params }) {
     const body = params && Object.keys(params).length > 0 ? { cmd_id: cmdId, params } : { cmd_id: cmdId };
     await this.#request('PUT', `/api/entities/${encodeURIComponent(entityId)}/command`, body);
+  }
+
+  async #ui(activityId) {
+    this.#requireActivity(activityId);
+    if (!this.#uis.has(activityId)) {
+      const { data } = await this.#request('GET', `/api/activities/${encodeURIComponent(activityId)}/ui`);
+      this.#uis.set(activityId, toPages(data));
+    }
+    return this.#uis.get(activityId);
+  }
+
+  #forgetActivity(activityId) {
+    this.#mappings.delete(activityId);
+    this.#uis.delete(activityId);
+    this.emit('pages', activityId);
   }
 
   get #label() {
@@ -278,6 +501,7 @@ export class Remote extends EventEmitter {
     ]);
     this.#state.activities = activities;
     this.#mappings.clear();
+    this.#uis.clear();
     this.#state.battery = toBattery(battery.data);
     this.#state.batteryProblem = battery.problem;
     this.#state.powerSupply = power.data?.power_supply ?? battery.data?.power_supply ?? null;
@@ -383,6 +607,8 @@ export class Remote extends EventEmitter {
     const data = message.msg_data ?? {};
     if (message.msg === 'entity_change' && data.entity_type === 'activity') {
       this.#applyActivityChange(data);
+    } else if (message.msg === 'entity_change' && data.entity_id && WIDGET_ENTITY_TYPES.has(data.entity_type)) {
+      this.#applyWidgetChange(data);
     } else if (message.msg === 'entity_change' && !data.entity_id && !data.entity_type) {
       this.#reload();
     } else if (message.msg === 'battery_status') {
@@ -405,17 +631,40 @@ export class Remote extends EventEmitter {
     }
     if (eventType === 'DELETE') {
       activities.delete(entityId);
-      this.#mappings.delete(entityId);
+      this.#forgetActivity(entityId);
     } else if (newState?.name !== undefined) {
       if (newState.enabled === false) activities.delete(entityId);
       else activities.set(entityId, toActivity({ entity_id: entityId, ...newState }));
-      this.#mappings.delete(entityId);
+      this.#forgetActivity(entityId);
     } else if (activities.has(entityId) && newState?.attributes?.state !== undefined) {
       activities.get(entityId).state = newState.attributes.state;
     } else {
       return;
     }
     this.#emitChange();
+  }
+
+  #applyWidgetChange({ event_type: eventType, entity_id: entityId, new_state: newState }) {
+    const watched = this.#watched.get(entityId);
+    if (!watched) return;
+    if (eventType === 'DELETE') {
+      this.#watched.delete(entityId);
+      this.#images.delete(entityId);
+      this.emit('entity', { id: entityId, type: watched.entity_type, missing: true });
+      return;
+    }
+    const now = Date.now();
+    const attributes = newState?.attributes ?? {};
+    const before = mediaPosition(watched, now);
+    if (newState?.name !== undefined) watched.name = newState.name;
+    if (newState?.options !== undefined) watched.options = newState.options;
+    Object.assign(watched.attributes, attributes);
+    if (finite(attributes.media_position) !== null) watched.positionAt = now;
+    else if (attributes.state !== undefined && before !== null) {
+      watched.attributes.media_position = before;
+      watched.positionAt = now;
+    }
+    this.emit('entity', toEntityView(watched, now));
   }
 
   async #reload() {
@@ -425,6 +674,14 @@ export class Remote extends EventEmitter {
     } catch (error) {
       this.#socket?.terminate();
       this.emit('warning', `Reloading ${this.#label} failed: ${error.message}`);
+    }
+  }
+
+  async #fetchArtwork(url) {
+    try {
+      return await fetch(url, { signal: AbortSignal.timeout(this.#timeoutMs) });
+    } catch (error) {
+      throw new HttpError(504, `The artwork server did not answer (${error.cause?.code ?? error.name}).`);
     }
   }
 
