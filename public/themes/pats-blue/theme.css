@@ -13,6 +13,8 @@
   --glow: rgba(141, 185, 255, 0.4);
   --ok: #85d4b1;
   --on: #3ddc84;
+  --caution: #f5b942;
+  --danger: #ff5c5c;
   --warn: #f4ca83;
   --font-body: ui-rounded, "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
   --font-display: ui-rounded, "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;

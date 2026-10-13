@@ -18,6 +18,8 @@
   --glow: rgba(230, 57, 70, 0.45);
   --ok: #4fd1a5;
   --on: #3ddc84;
+  --caution: #f5b942;
+  --danger: #ff5c5c;
   --warn: #ffb547;
   --font-body: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { discoverThemes } from '../src/server.js';
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-const TOKENS = ['bg', 'surface', 'surface-raised', 'border', 'text', 'muted', 'accent', 'accent-fill', 'accent-fill-hover', 'on-accent', 'glow', 'ok', 'on', 'warn', 'font-body', 'font-display', 'font-label', 'display-weight', 'label-case', 'label-tracking', 'radius'];
+const TOKENS = ['bg', 'surface', 'surface-raised', 'border', 'text', 'muted', 'accent', 'accent-fill', 'accent-fill-hover', 'on-accent', 'glow', 'ok', 'on', 'caution', 'danger', 'warn', 'font-body', 'font-display', 'font-label', 'display-weight', 'label-case', 'label-tracking', 'radius'];
 
 function luminance(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -60,6 +60,18 @@ for (const theme of themes) {
     }
   });
 
+  test(`the ${theme.name} theme's battery colors are a visible amber and red`, async () => {
+    const css = await readFile(path.join(publicDir, 'themes', theme.id, 'theme.css'), 'utf8');
+    const color = (token) => css.match(new RegExp(`--${token}: (#[0-9a-f]{6});`))[1];
+    const caution = hsl(color('caution'));
+    const danger = hsl(color('danger'));
+    assert.ok(caution.hue >= 30 && caution.hue <= 55 && caution.sat >= 0.5, `${theme.id}: --caution ${color('caution')} is not amber (hue ${caution.hue.toFixed(0)})`);
+    assert.ok((danger.hue <= 10 || danger.hue >= 350) && danger.sat >= 0.5, `${theme.id}: --danger ${color('danger')} is not red (hue ${danger.hue.toFixed(0)})`);
+    for (const token of ['caution', 'danger']) {
+      assert.ok(contrast(color(token), color('surface')) >= 3, `${theme.id}: --${token} on surface is ${contrast(color(token), color('surface')).toFixed(2)}:1`);
+    }
+  });
+
   test(`the ${theme.name} theme's activity-on dot is a visible green`, async () => {
     const css = await readFile(path.join(publicDir, 'themes', theme.id, 'theme.css'), 'utf8');
     const color = (token) => css.match(new RegExp(`--${token}: (#[0-9a-f]{6});`))[1];
@@ -74,4 +86,11 @@ test('an activity that is on shows its dot in the theme green', async () => {
   const rule = css.match(/:is\(\.tile, \.control-title\)\[data-state="ON"\] \.badge::before \{([^}]*)\}/);
   assert.ok(rule, 'styles.css has no rule for the ON dot');
   assert.match(rule[1], /background: var\(--on\);/);
+});
+
+test('the battery meter takes its color from the battery level, not the warning state', async () => {
+  const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
+  assert.doesNotMatch(css, /\.chip\.is-warn \.meter-fill/);
+  const app = await readFile(path.join(publicDir, 'app.js'), 'utf8');
+  assert.match(app, /fill\.style\.background = batteryFill\(remote\.battery\.capacity\);/);
 });
