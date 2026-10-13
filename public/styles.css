@@ -147,20 +147,20 @@ svg {
   animation-delay: 0.5s;
 }
 
-.logo.is-sending .wave {
-  animation: logo-send 0.45s ease-out;
+.logo.is-sending .wave-1 {
+  animation: logo-send 0.45s ease-out, logo-wave 2.4s ease-in-out 0.45s infinite;
 }
 
 .logo.is-sending .wave-2 {
-  animation-delay: 0.08s;
+  animation: logo-send 0.45s ease-out 0.08s backwards, logo-wave 2.4s ease-in-out 0.78s infinite;
 }
 
 .logo.is-sending .wave-3 {
-  animation-delay: 0.16s;
+  animation: logo-send 0.45s ease-out 0.16s backwards, logo-wave 2.4s ease-in-out 1.11s infinite;
 }
 
 .logo.is-sending .logo-core {
-  animation: logo-press 0.3s ease-out;
+  animation: logo-press 0.3s ease-out, logo-core 2.4s ease-in-out 0.3s infinite;
 }
 
 @keyframes logo-sweep {
