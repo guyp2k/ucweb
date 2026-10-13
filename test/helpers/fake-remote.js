@@ -24,8 +24,18 @@ export function mapping(entityId) {
   ];
 }
 
-export async function startFakeRemote({ activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {}, deviceName = 'Test Den' } = {}) {
+export async function startFakeRemote({
+  activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {},
+  deviceName = 'Test Den', profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [],
+} = {}) {
   const state = {
+    profiles,
+    activeProfile,
+    profilePages,
+    groups,
+    drivers,
+    instances,
+    listRequests: [],
     activities,
     buttonMappings,
     entities,
@@ -80,6 +90,24 @@ export async function startFakeRemote({ activities = [activity('act.tv', 'Watch 
       state.uiRequests += 1;
       const found = state.uis[decodeURIComponent(ui[1])];
       return found ? send(res, 200, found) : send(res, 404, { message: 'no such activity' });
+    }
+    const paged = (items) => {
+      const page = Number(url.searchParams.get('page') ?? 1);
+      const limit = Number(url.searchParams.get('limit') ?? 10);
+      state.listRequests.push({ path: url.pathname, page, limit });
+      return send(res, 200, items.slice((page - 1) * limit, page * limit), { 'pagination-count': String(items.length) });
+    };
+    if (url.pathname === '/api/entities' && req.method === 'GET') return paged([...state.activities, ...Object.values(state.entities)]);
+    if (url.pathname === '/api/intg/drivers' && req.method === 'GET') return paged(state.drivers);
+    if (url.pathname === '/api/intg/instances' && req.method === 'GET') return paged(state.instances);
+    if (url.pathname === '/api/profiles' && req.method === 'GET') return send(res, 200, state.profiles);
+    if (url.pathname === '/api/profiles/active' && req.method === 'GET') {
+      return state.activeProfile ? send(res, 200, state.activeProfile) : send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
+    }
+    const profilePart = url.pathname.match(/^\/api\/profiles\/([^/]+)\/(pages|groups)$/);
+    if (profilePart && req.method === 'GET') {
+      const found = state[profilePart[2] === 'pages' ? 'profilePages' : 'groups'][decodeURIComponent(profilePart[1])];
+      return found ? send(res, 200, found) : send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
     }
     if (url.pathname === '/api/activities' && req.method === 'GET') {
       const page = Number(url.searchParams.get('page') ?? 1);

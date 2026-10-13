@@ -43,7 +43,16 @@ before(async () => {
     entities: {
       'media.tv': { entity_id: 'media.tv', entity_type: 'media_player', name: { en: 'TV' }, features: ['play_pause', 'next'], attributes: { state: 'PLAYING' } },
       'sensor.vol': { entity_id: 'sensor.vol', entity_type: 'sensor', name: { en: 'Volume' }, attributes: { state: 'ON', value: '30', unit: 'dB' } },
+      'light.desk': { entity_id: 'light.desk', entity_type: 'light', name: { en: 'Desk' }, features: ['dim'], attributes: { state: 'OFF' } },
+      'remote.amp': {
+        entity_id: 'remote.amp', entity_type: 'remote', name: { en: 'Amp' }, features: ['send_cmd'], attributes: { state: 'ON' },
+        options: { button_mapping: [{ button: 'MUTE', short_press: { cmd_id: 'mute' } }] },
+      },
     },
+    profiles: [{ profile_id: 'p', name: 'Home' }],
+    profilePages: { p: [{ page_id: 'lights', profile_id: 'p', name: 'Lights', items: [{ entity_id: 'light.desk', pos: 1 }] }] },
+    drivers: [{ driver_id: 'hass', name: { en: 'Home Assistant' }, driver_type: 'LOCAL', version: '1', driver_state: 'ACTIVE' }],
+    instances: [{ integration_id: 'hass.main', driver_id: 'hass', device_state: 'CONNECTED', setup_data: { token: 'ha-secret' } }],
   });
   remote = new Remote({ address: fake.address, keysDir: dir, reconnectDelays: [20] });
   remote.start();
@@ -159,7 +168,7 @@ test('a signed-in browser gets an activity\'s pages with the state of their widg
   assert.deepEqual(pages.map((page) => [page.id, page.name, page.items.length]), [['main', 'Main', 3]]);
   assert.equal(pages[0].items[0].action, true);
   assert.equal(JSON.stringify(pages).includes('select_source'), false);
-  assert.deepEqual(entities['sensor.vol'], { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', value: '30', unit: 'dB' });
+  assert.deepEqual(entities['sensor.vol'], { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', deviceClass: null, icon: null, value: '30', unit: 'dB' });
 });
 
 test('a page item press runs the command the page stores', async () => {
@@ -189,7 +198,7 @@ test('a signed-in browser can drive a player on an open page within what it supp
   assert.deepEqual(fake.state.commands, [{ entityId: 'media.tv', body: { cmd_id: 'media_player.play_pause' } }]);
   fake.state.commands.length = 0;
   assert.equal((await authed(route, { method: 'POST', body: '{"action":"seek","value":10}' })).status, 409);
-  assert.equal((await authed(route, { method: 'POST', body: '{"action":"off"}' })).status, 400);
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"explode"}' })).status, 400);
   assert.equal((await authed(route, { method: 'POST', body: '{"action":"next"}', headers: { origin: 'http://evil.example' } })).status, 403);
   assert.equal((await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"next"}' })).status, 401);
   assert.equal((await authed(route)).status, 405);
@@ -217,7 +226,7 @@ test('live widget changes and page edits reach the browser', async (t) => {
   t.after(() => socket.terminate());
   fake.emit('entity_change', { entity_type: 'sensor', entity_id: 'sensor.vol', event_type: 'CHANGE', new_state: { attributes: { value: '35' } } });
   const entity = await waitFor(() => messages.find((message) => message.type === 'entity'), { message: 'entity message' });
-  assert.deepEqual(entity, { type: 'entity', remote: fake.address, entity: { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', value: '35', unit: 'dB' } });
+  assert.deepEqual(entity, { type: 'entity', remote: fake.address, entity: { id: 'sensor.vol', type: 'sensor', name: 'Volume', state: 'ON', deviceClass: null, icon: null, value: '35', unit: 'dB' } });
   fake.emit('entity_change', { entity_type: 'activity', entity_id: 'act.tv', event_type: 'CHANGE', new_state: { name: { en: 'Watch TV' }, attributes: { state: 'OFF' } } });
   const pages = await waitFor(() => messages.find((message) => message.type === 'pages'), { message: 'pages message' });
   assert.deepEqual(pages, { type: 'pages', remote: fake.address, activity: 'act.tv' });
@@ -318,4 +327,57 @@ test('the build version changes when any page file changes', async () => {
 test('signing out clears the cookie', async () => {
   const response = await authed('/api/session', { method: 'DELETE' });
   assert.match(response.headers.get('set-cookie'), /^ucweb_session=; .*Max-Age=0$/);
+});
+
+test('a signed-in browser reads the remote\'s pages, entities and integrations, and never an integration\'s setup data', async () => {
+  const at = `/api/remotes/${encodeURIComponent(fake.address)}`;
+  const profile = await (await authed(`${at}/profile`)).json();
+  assert.deepEqual(profile.pages, [{ id: 'lights', name: 'Lights', items: [{ entityId: 'light.desk', type: 'light' }] }]);
+  assert.equal(profile.entities['light.desk'].name, 'Desk');
+  const { entities } = await (await authed(`${at}/entities`)).json();
+  assert.deepEqual(entities.map((entity) => entity.id), ['remote.amp', 'light.desk', 'media.tv', 'sensor.vol']);
+  const integrations = await authed(`${at}/integrations`);
+  const body = await integrations.text();
+  assert.equal(integrations.status, 200);
+  assert.ok(!body.includes('ha-secret') && !body.includes('setup_data'), body);
+  assert.equal(JSON.parse(body).integrations[0].name, 'Home Assistant');
+  for (const part of ['profile', 'entities', 'integrations']) {
+    assert.equal((await fetch(`${base}${at}/${part}`)).status, 401, part);
+  }
+});
+
+test('device controls need a session and a same-site POST, and send only what the device supports', async () => {
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/entities/light.desk/control`;
+  fake.state.commands.length = 0;
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"brightness","value":20}' })).status, 200);
+  assert.deepEqual(fake.state.commands, [{ entityId: 'light.desk', body: { cmd_id: 'light.on', params: { brightness: 51 } } }]);
+  fake.state.commands.length = 0;
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"brightness","value":200}' })).status, 400);
+  assert.equal((await authed(route, { method: 'POST', body: '{"action":"on"}', headers: { origin: 'http://evil.example' } })).status, 403);
+  assert.equal((await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"action":"on"}' })).status, 401);
+  assert.equal((await authed(route)).status, 405);
+  assert.deepEqual(fake.state.commands, []);
+});
+
+test('a remote device opens like an activity: its buttons press through the device route, and it has no power route', async () => {
+  const at = `/api/remotes/${encodeURIComponent(fake.address)}/devices/remote.amp`;
+  fake.state.commands.length = 0;
+  assert.deepEqual(await (await authed(`${at}/buttons`)).json(), [{ button: 'MUTE', mapped: true, fallback: false }]);
+  assert.equal((await authed(`${at}/buttons/MUTE`, { method: 'POST', body: '{}' })).status, 200);
+  assert.deepEqual(fake.state.commands, [{ entityId: 'remote.amp', body: { cmd_id: 'remote.send_cmd', params: { command: 'mute' } } }]);
+  assert.equal((await authed(`${at}/power`, { method: 'POST', body: '{"on":true}' })).status, 404);
+  assert.equal((await authed(`/api/remotes/${encodeURIComponent(fake.address)}/devices/act.tv/buttons`)).status, 404);
+});
+
+test('profile and integration changes reach the browser so it can reload them', async () => {
+  const { socket, messages } = await openEvents({ cookie, origin: base });
+  await waitFor(() => messages.length > 0, { message: 'snapshot' });
+  fake.emit('profile_change', { event_type: 'CHANGE' });
+  fake.emit('integration_change', { event_type: 'CHANGE' });
+  await waitFor(() => messages.some((message) => message.type === 'integrations'), { message: 'integrations event' });
+  assert.deepEqual(messages.filter((message) => message.type === 'profile' || message.type === 'integrations'), [
+    { type: 'profile', remote: fake.address },
+    { type: 'integrations', remote: fake.address },
+  ]);
+  socket.close();
 });

@@ -1,10 +1,11 @@
 # ucweb
 
 A web remote for [Unfolded Circle](https://www.unfoldedcircle.com/) Remote 3 and Remote Two. Open it on a phone
-or in a desktop browser to start and stop activities, use your activity pages, drive the D-pad, volume and
-transport buttons, play from your music library, and watch every remote's status live.
+or in a desktop browser to start and stop activities, use your activity pages and the remote's own pages, switch
+lights and set thermostats, drive the D-pad, volume and transport buttons, play from your music library, browse
+every entity and integration, and watch every remote's status live.
 
-![ucweb on a desktop: status bar, activities and the Now Playing page](docs/screenshots/desktop.webp)
+![ucweb on a desktop: the menu with the remote's pages, the status bar, activities and the Now Playing page](docs/screenshots/desktop.webp)
 
 <p align="center">
   <img src="docs/screenshots/phone-now.webp" width="240" alt="Activity page with a media widget and its controls">
@@ -16,8 +17,20 @@ The screenshots use made-up remotes, activities and music.
 
 ## Features
 
+- **Menu**: the remote's own pages (the ones on its home screen, in the same order), then Entities and
+  Integrations. On a wide screen the menu stays open beside the page; on a phone or tablet the menu button opens it.
 - **Activities**: every activity on each remote, with its live state (on, off, working, error). Tap to start,
   tap again to control, one tap to turn off.
+- **Remote pages**: each page from the remote's home screen, such as Music, Lights, Thermostats or Cameras, with every
+  entity on it as a live tile: switch lights and set their brightness, flip switches, set a thermostat's target and
+  mode, open, stop and position blinds, press buttons, run macros, read sensors, pick an option, play and pause
+  players (tap one for the full player), and start activities. Groups show as a titled block. Each tile offers only
+  what that entity reports it supports.
+- **Devices**: a remote device with its own pages or button mapping (an AV receiver, an IR device) opens in the
+  Control panel like an activity, with its pages and the control pad sending that device's own commands.
+- **Entities**: every entity on the remote in one searchable list, filtered by type, with the same live tiles.
+- **Integrations**: every integration set up on the remote with its version, developer and live connection state,
+  plus the installed drivers that have no device set up. Read only; setup data and tokens never leave the server.
 - **Control pad**: D-pad and OK, back, home, menu, volume, mute, channel, play/pause, previous, next, stop and
   record. Each button sends exactly what the activity's own button mapping sends; buttons the activity does not
   use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. On a
@@ -48,17 +61,20 @@ The screenshots use made-up remotes, activities and music.
   Graphite & Brass, Brookwood and Brookwood Light. Each browser keeps its own choice.
 
 ucweb only controls. It never changes a remote's configuration: use the remote's web configurator for that.
-Select widgets show their current option but can't change it, and numpad items are not drawn: no page on the
-remotes this was built against uses either.
+Select widgets on activity pages show their current option but can't change it (select tiles on the remote's
+pages can), and numpad items are not drawn: no page on the remotes this was built against uses either. Lights
+offer on, off and brightness, not color or color temperature.
 
 ## How it works
 
 A small Node server holds one API key per remote, keeps a live WebSocket connection to each remote's Core API,
 and serves the web app. The browser talks only to ucweb, never to the remotes, so the keys never leave the
-server. The server sends only five kinds of command: start or stop an activity, press a button that the activity maps, press
-an item on one of the activity's pages, drive a media player shown on an open page (only the controls it reports),
-and reboot or power off the remote. It looks the command up itself, so a browser can only name a button or
-a page item, never send an arbitrary command to your devices. Album art is fetched by the server from the address
+server. The server sends only these kinds of command: start or stop an activity, press a button that the activity
+or remote device maps, press an item on one of their pages, drive a media player (only the controls it reports),
+control a light, switch, thermostat, cover, button, macro, select or remote device within what it reports it
+supports, and reboot or power off the remote. It looks the command up itself, so a browser can only name a button,
+a page item or one of those actions, never send an arbitrary command to your devices. Integration listings carry
+only names, versions and states: setup data, such as a Home Assistant token, is dropped on the server. Album art is fetched by the server from the address
 the player reports, without the API key, and only image types are passed on.
 
 ## Install
@@ -167,6 +183,24 @@ screen and it opens full screen like an app.
 
 ## Using ucweb
 
+**Menu.** The menu lists the remote's pages in the order the remote shows them, with the number of items on each,
+then **Entities** and **Integrations**. Each browser remembers the last screen per remote. On a desktop the menu
+stays open on the left; on a phone, tap the menu button at the top left and it slides in.
+
+<p align="center">
+  <img src="docs/screenshots/phone-menu.webp" width="200" alt="Menu with the remote's pages, Entities and Integrations">
+  <img src="docs/screenshots/phone-lights.webp" width="200" alt="Lights page with light, switch, blinds and macro tiles">
+  <img src="docs/screenshots/phone-climate.webp" width="200" alt="Climate page with a thermostat and sensors">
+</p>
+
+**Remote pages.** A light shows a switch and, if it dims, a brightness slider. A thermostat shows the current
+temperature, steps the target with minus and plus (sent once you stop tapping) and picks its mode from the modes it
+supports. Blinds open, stop, close and move to a position. A player tile shows what is playing with its controls;
+tap it for the full player. A remote device with its own pages shows **Open controls**: tap it to drive that device
+in the Control panel, and the close button there hands the panel back to the running activity.
+
+![The Lights page on a desktop with the menu and the Control panel](docs/screenshots/desktop-lights.webp)
+
 **Activities.** Every activity on the selected remote, with its live state. Tap one that is off to start it, tap a
 running one to control it, and use **Turn off** to stop it. Switch remotes with the tabs at the top; each tab shows
 that remote's battery.
@@ -211,6 +245,15 @@ that is the list of Spotify Connect devices.
 | `[` `]` | Previous and next page |
 | `0` | First page |
 | `T` | Switch between pages and controls |
+
+**Entities and integrations.** Entities lists everything on the remote; type in the search box or pick a type to
+narrow it, and use the tiles as on any page. Integrations shows each one's state (connected, connecting,
+disconnected, error) as it changes.
+
+<p align="center">
+  <img src="docs/screenshots/phone-entities.webp" width="240" alt="Entities with search, type filters and live tiles">
+  <img src="docs/screenshots/phone-integrations.webp" width="240" alt="Integrations with version, developer and state">
+</p>
 
 **Remote panel.** At the bottom of the page: open the remote's own web configurator, reboot the remote, or power
 it off. Reboot and power off ask you to tap twice.
