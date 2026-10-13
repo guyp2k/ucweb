@@ -22,6 +22,8 @@ const DEVICE_FEATURES = {
   remote: ['on_off', 'toggle'],
 };
 const TEMPERATURE_UNITS = { CELSIUS: '°C', FAHRENHEIT: '°F' };
+const REMOTE_TEMPERATURE_UNITS = { METRIC: '°C', UK: '°C', US: '°F' };
+const TARGET_COMMANDS = { '°C': 'climate.target_temperature_c', '°F': 'climate.target_temperature_f' };
 const SYSTEM_COMMANDS = new Set(['REBOOT', 'POWER_OFF']);
 const ITEM_TYPES = new Set(['text', 'icon', 'media_player', 'sensor', 'select']);
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
@@ -314,7 +316,7 @@ export function artFor(watched, players) {
   return null;
 }
 
-export function toEntityView(watched, now = Date.now(), art = loadableArt(watched.attributes?.media_image_url)) {
+export function toEntityView(watched, now = Date.now(), art = loadableArt(watched.attributes?.media_image_url), { measurementUnit = null } = {}) {
   const attributes = watched.attributes ?? {};
   const view = {
     id: watched.entity_id,
@@ -352,7 +354,7 @@ export function toEntityView(watched, now = Date.now(), art = loadableArt(watche
     view.option = typeof attributes.current_option === 'string' && attributes.current_option ? attributes.current_option : null;
     view.options = selectOptions(attributes);
   } else if (Object.hasOwn(DEVICE_FEATURES, watched.entity_type)) {
-    Object.assign(view, deviceView(watched, attributes));
+    Object.assign(view, deviceView(watched, attributes, measurementUnit));
   }
   return view;
 }
@@ -365,7 +367,7 @@ function climateModes(features) {
   return CLIMATE_MODES.filter(([feature]) => features.includes(feature)).map(([, mode]) => mode);
 }
 
-function deviceView(watched, attributes) {
+function deviceView(watched, attributes, measurementUnit) {
   const type = watched.entity_type;
   const features = DEVICE_FEATURES[type].filter((feature) => watched.features.includes(feature));
   if (POWER_TYPES.has(type)) {
@@ -384,7 +386,7 @@ function deviceView(watched, attributes) {
       min: finite(options.min_temperature),
       max: finite(options.max_temperature),
       step: finite(options.target_temperature_step) > 0 ? options.target_temperature_step : null,
-      unit: TEMPERATURE_UNITS[options.temperature_unit] ?? null,
+      unit: TEMPERATURE_UNITS[options.temperature_unit] ?? REMOTE_TEMPERATURE_UNITS[measurementUnit] ?? null,
       modes: climateModes(watched.features),
     };
   }
@@ -460,6 +462,7 @@ export class Remote extends EventEmitter {
   #browseMemory = new Map();
   #artKeys = new Map();
   #entityLoad = null;
+  #measurementUnit = null;
   #state;
 
   constructor({
@@ -758,11 +761,13 @@ export class Remote extends EventEmitter {
       if (!modes.includes(value)) throw new HttpError(400, `${name} can be set to ${modes.join(', ') || 'no mode'}.`);
       command = value === 'OFF' ? { entityId, cmdId: 'climate.off' } : { entityId, cmdId: 'climate.hvac_mode', params: { hvac_mode: value } };
     } else if (action === 'target') {
-      const view = toEntityView(watched);
+      const view = toEntityView(watched, Date.now(), null, { measurementUnit: this.#measurementUnit });
       const low = view.min ?? -Infinity;
       const high = view.max ?? Infinity;
       if (finite(value) === null || value < low || value > high) throw new HttpError(400, `Send a temperature from ${view.min ?? 'any'} to ${view.max ?? 'any'}.`);
-      command = { entityId, cmdId: 'climate.target_temperature', params: { temperature: value } };
+      const cmdId = TARGET_COMMANDS[view.unit];
+      if (!cmdId) throw new HttpError(409, `${this.#label} did not say whether ${name} is in Celsius or Fahrenheit, so ucweb will not guess.`);
+      command = { entityId, cmdId, params: { temperature: value } };
     } else if (action === 'position') {
       if (!Number.isInteger(value) || value < 0 || value > 100) throw new HttpError(400, 'Send a position from 0 to 100.');
       command.params = { position: value };
@@ -843,7 +848,8 @@ export class Remote extends EventEmitter {
   }
 
   #view(watched, now) {
-    const view = toEntityView(watched, now, watched.entity_type === 'media_player' ? artFor(watched, [...this.#watched.values()]) : null);
+    const art = watched.entity_type === 'media_player' ? artFor(watched, [...this.#watched.values()]) : null;
+    const view = toEntityView(watched, now, art, { measurementUnit: this.#measurementUnit });
     if (watched.entity_type === 'media_player') this.#artKeys.set(watched.entity_id, view.image);
     return view;
   }
@@ -1007,10 +1013,13 @@ export class Remote extends EventEmitter {
       const seen = (page - 1) * PAGE_SIZE + batch.length;
       if (batch.length < PAGE_SIZE || (Number.isFinite(total) && total > 0 && seen >= total)) break;
     }
-    const [battery, power] = await Promise.all([
+    const [battery, power, localization] = await Promise.all([
       this.#optional('/api/system/power/battery'),
       this.#optional('/api/system/power'),
+      this.#optional('/api/cfg/localization'),
     ]);
+    const unit = localization.data?.measurement_unit;
+    this.#measurementUnit = Object.hasOwn(REMOTE_TEMPERATURE_UNITS, unit ?? '') ? unit : null;
     this.#state.activities = activities;
     this.#mappings.clear();
     this.#uis.clear();
