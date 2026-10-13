@@ -276,7 +276,7 @@ test('artwork is refused for players not on an open page, empty players and non-
   await assert.rejects(remote.mediaImage('media.dmp'), { status: 502 });
   fake.emit('entity_change', { entity_type: 'media_player', entity_id: 'media.dmp', event_type: 'CHANGE', new_state: { attributes: { media_image_url: 'file:///etc/passwd' } } });
   await new Promise((resolve) => setTimeout(resolve, 50));
-  await assert.rejects(remote.mediaImage('media.dmp'), { status: 502 });
+  await assert.rejects(remote.mediaImage('media.dmp'), { status: 404 });
 });
 
 test('a player reports only the controls ucweb offers that it supports, with its volume and modes', async () => {
@@ -481,4 +481,67 @@ test('a list that reports items but sends none never asks for more', async () =>
   assert.equal(list.total, 455);
   assert.deepEqual(list.items, []);
   assert.equal(list.more, false);
+});
+
+const twoPlayers = {
+  pages: [
+    { page_id: 'dmp', grid: { width: 4, height: 6 }, items: [{ type: 'media_player', media_player_id: 'media.dmp', location: { x: 0, y: 0 }, size: { width: 4, height: 4 } }] },
+    { page_id: 'roon', grid: { width: 4, height: 6 }, items: [{ type: 'media_player', media_player_id: 'media.roon', location: { x: 0, y: 0 }, size: { width: 4, height: 4 } }] },
+  ],
+};
+
+async function connectTwoPlayers(roonTrack = { media_title: 'Orestes', media_artist: 'A Perfect Circle' }) {
+  const players = {
+    'media.dmp': {
+      entity_id: 'media.dmp', entity_type: 'media_player', name: { en: 'DMP-A10' }, features: ['play_pause'],
+      attributes: { state: 'PLAYING', media_title: 'Orestes', media_artist: 'A Perfect Circle', media_image_url: '/storage/emulated/0/.zcontrol/cache/phonecontrol/1.png' },
+    },
+    'media.roon': {
+      entity_id: 'media.roon', entity_type: 'media_player', name: { en: 'Roon zone' }, features: ['play_pause'],
+      attributes: { state: 'PLAYING', ...roonTrack, media_image_url: 'ROON_ART' },
+    },
+  };
+  await connect({ uis: { 'act.tv': twoPlayers }, entities: players, art: { 'roon.jpg': { type: 'image/jpeg', body: Buffer.from('ffd8ffe0', 'hex') }, 'next.jpg': { type: 'image/jpeg', body: Buffer.from('ffd8ffe1', 'hex') } } });
+  fake.state.entities['media.roon'].attributes.media_image_url = `http://${fake.address}/art/roon.jpg`;
+}
+
+test('a player whose artwork is a file path borrows the cover of a player on the pages playing the same track', async () => {
+  await connectTwoPlayers();
+  const { entities: states } = await remote.pages('act.tv');
+  assert.match(states['media.dmp'].image, /^[0-9a-f]{16}$/);
+  assert.equal(states['media.dmp'].image, states['media.roon'].image);
+  assert.deepEqual((await remote.mediaImage('media.dmp')).body, Buffer.from('ffd8ffe0', 'hex'));
+});
+
+test('artwork is never borrowed from a player playing something else, matched on title and artist', async () => {
+  for (const track of [{ media_title: 'Judith', media_artist: 'A Perfect Circle' }, { media_title: 'Orestes', media_artist: 'Someone Else' }, { media_title: 'Orestes' }]) {
+    await connectTwoPlayers(track);
+    const { entities: states } = await remote.pages('act.tv');
+    assert.equal(states['media.dmp'].image, null, JSON.stringify(track));
+    await assert.rejects(remote.mediaImage('media.dmp'), { status: 404 });
+    remote.stop();
+    await fake.close();
+  }
+  fake = null;
+});
+
+test('artwork that cannot be fetched is reported as no artwork, so browsers never ask for it', () => {
+  for (const url of ['/storage/emulated/0/a.png', 'file:///etc/passwd', 'ftp://host/a.jpg', 'javascript:alert(1)', '']) {
+    const view = toEntityView({ entity_id: 'm', entity_type: 'media_player', attributes: { media_image_url: url }, positionAt: null });
+    assert.equal(view.image, null, url);
+  }
+  assert.match(toEntityView({ entity_id: 'm', entity_type: 'media_player', attributes: { media_image_url: 'https://x.example/a.jpg' }, positionAt: null }).image, /^[0-9a-f]{16}$/);
+});
+
+test('when the matching player\'s cover changes, the borrowing widget is updated live', async () => {
+  await connectTwoPlayers();
+  const before = (await remote.pages('act.tv')).entities['media.dmp'].image;
+  const seen = [];
+  remote.on('entity', (view) => seen.push(view));
+  fake.emit('entity_change', { entity_type: 'media_player', entity_id: 'media.roon', event_type: 'CHANGE', new_state: { attributes: { media_image_url: `http://${fake.address}/art/next.jpg` } } });
+  await waitFor(() => seen.some((view) => view.id === 'media.dmp'), { message: 'borrowing widget updated' });
+  const after = seen.find((view) => view.id === 'media.dmp').image;
+  assert.notEqual(after, before);
+  assert.equal(after, seen.find((view) => view.id === 'media.roon').image);
+  assert.deepEqual((await remote.mediaImage('media.dmp')).body, Buffer.from('ffd8ffe1', 'hex'));
 });
