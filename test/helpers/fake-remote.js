@@ -26,9 +26,10 @@ export function mapping(entityId) {
 
 export async function startFakeRemote({
   activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {},
-  deviceName = 'Test Den', profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [],
+  deviceName = 'Test Den', localization = { language_code: 'en_US', country_code: 'US', measurement_unit: 'METRIC' }, profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [],
 } = {}) {
   const state = {
+    localization,
     profiles,
     activeProfile,
     profilePages,
@@ -135,6 +136,9 @@ export async function startFakeRemote({
       return send(res, 200, state.battery);
     }
     if (url.pathname === '/api/system/power') return send(res, 200, { mode: state.powerMode, power_supply: state.powerSupply });
+    if (url.pathname === '/api/cfg/localization') {
+      return state.localization ? send(res, 200, state.localization) : send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
+    }
     if (url.pathname === '/api/system' && req.method === 'POST') {
       if (req.headers['content-length'] === undefined) return send(res, 411);
       const cmd = url.searchParams.get('cmd');

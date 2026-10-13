@@ -192,7 +192,7 @@ test('device controls send the command each entity type takes, scaled where the 
     ['switch.fan', { cmd_id: 'switch.off' }],
     ['climate.hall', { cmd_id: 'climate.off' }],
     ['climate.hall', { cmd_id: 'climate.hvac_mode', params: { hvac_mode: 'HEAT' } }],
-    ['climate.hall', { cmd_id: 'climate.target_temperature', params: { temperature: 70.5 } }],
+    ['climate.hall', { cmd_id: 'climate.target_temperature_c', params: { temperature: 70.5 } }],
     ['cover.blind', { cmd_id: 'cover.position', params: { position: 25 } }],
     ['button.bass', { cmd_id: 'button.push' }],
     ['macro.night', { cmd_id: 'macro.run' }],
@@ -322,4 +322,61 @@ test('the remote subscribes to every entity type ucweb shows plus profile and in
   for (const channel of ['entity_light', 'entity_switch', 'entity_climate', 'entity_cover', 'entity_button', 'entity_macro', 'entity_remote', 'profiles', 'integrations']) {
     assert.ok(channels.includes(channel), channel);
   }
+});
+
+test('a thermostat target goes out as the remote\'s Celsius or Fahrenheit command: the entity\'s own unit first, else the remote\'s setting', async () => {
+  const withUnit = structuredClone(ENTITIES);
+  withUnit['climate.study'] = { ...structuredClone(ENTITIES['climate.hall']), entity_id: 'climate.study', options: { min_temperature: 10, max_temperature: 30, temperature_unit: 'CELSIUS' } };
+  await connect({ entities: withUnit, localization: { measurement_unit: 'US' } });
+  await remote.deviceCommand('climate.hall', 'target', 70);
+  await remote.deviceCommand('climate.study', 'target', 21);
+  assert.deepEqual(fake.state.commands.map((command) => command.body.cmd_id), ['climate.target_temperature_f', 'climate.target_temperature_c']);
+  const { entities } = await remote.entities();
+  assert.deepEqual(entities.filter((view) => view.type === 'climate').map((view) => [view.id, view.unit]), [['climate.hall', '°F'], ['climate.study', '°C']]);
+});
+
+test('a thermostat target is refused, not guessed, when neither the entity nor the remote names a unit', async () => {
+  await connect({ localization: null });
+  await assert.rejects(remote.deviceCommand('climate.hall', 'target', 70), { status: 409 });
+  assert.deepEqual(fake.state.commands, []);
+  assert.equal((await remote.entities()).entities.find((view) => view.id === 'climate.hall').unit, null);
+});
+
+test('every command ucweb can send is one the remote lists in its entity command metadata', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const known = new Set(JSON.parse(await readFile(new URL('./fixtures/entity-command-ids.json', import.meta.url), 'utf8')));
+  const entities = structuredClone(ENTITIES);
+  entities['media.full'] = entity('media.full', 'media_player', {
+    features: ['on_off', 'toggle', 'play_pause', 'stop', 'previous', 'next', 'volume_up_down', 'mute_toggle', 'seek', 'volume', 'shuffle', 'repeat', 'select_source'],
+    attributes: { state: 'PLAYING', media_duration: 100, source_list: ['A'] },
+  });
+  entities['cover.blind'].features.push('stop');
+  await connect({ entities, localization: { measurement_unit: 'US' } });
+  await remote.entities();
+  const devices = [
+    ['light.lamp', ['on', 'off', 'toggle', ['brightness', 40]]],
+    ['switch.fan', ['on', 'off', 'toggle']],
+    ['climate.hall', ['on', 'off', ['mode', 'HEAT'], ['mode', 'OFF'], ['target', 70]]],
+    ['cover.blind', ['open', 'close', 'stop', ['position', 10]]],
+    ['button.bass', ['push']],
+    ['macro.night', ['run']],
+    ['select.input', [['select_option', 'USB']]],
+    ['remote.avr', ['on', 'off', 'toggle']],
+  ];
+  for (const [id, actions] of devices) {
+    for (const action of actions) {
+      const [name, value] = Array.isArray(action) ? action : [action];
+      await remote.deviceCommand(id, name, value);
+    }
+  }
+  for (const [action, value] of [['on'], ['off'], ['toggle'], ['play_pause'], ['stop'], ['previous'], ['next'], ['volume_up'], ['volume_down'], ['mute_toggle'], ['seek', 5], ['volume', 5], ['shuffle', true], ['repeat', 'ALL'], ['select_source', 'A']]) {
+    await remote.playerCommand('media.full', action, value);
+  }
+  await remote.pressItem('remote.avr', 'main', 0, 'device');
+  await remote.pressItem('remote.ir', 'p', 0, 'device');
+  await remote.setActivityPower('act.tv', true);
+  await remote.setActivityPower('act.tv', false);
+  const sent = [...new Set(fake.state.commands.map((command) => command.body.cmd_id))];
+  assert.ok(sent.length >= 30, `sent ${sent.length} kinds of command`);
+  assert.deepEqual(sent.filter((cmdId) => !known.has(cmdId)), []);
 });
