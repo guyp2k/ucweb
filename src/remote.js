@@ -172,7 +172,30 @@ function mediaPosition(watched, now) {
   return duration !== null && duration > 0 ? Math.min(moved, duration) : moved;
 }
 
-export function toEntityView(watched, now = Date.now()) {
+const normalText = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+
+export function loadableArt(url) {
+  return typeof url === 'string' && /^(https?:\/\/|data:image\/)/i.test(url.trim()) ? url.trim() : null;
+}
+
+export function artFor(watched, players) {
+  const attributes = watched.attributes ?? {};
+  const own = loadableArt(attributes.media_image_url);
+  if (own) return own;
+  const title = normalText(attributes.media_title);
+  if (!title) return null;
+  const artist = normalText(attributes.media_artist);
+  for (const other of players) {
+    if (other === watched || other.entity_type !== 'media_player') continue;
+    const theirs = other.attributes ?? {};
+    if (normalText(theirs.media_title) !== title || normalText(theirs.media_artist) !== artist) continue;
+    const borrowed = loadableArt(theirs.media_image_url);
+    if (borrowed) return borrowed;
+  }
+  return null;
+}
+
+export function toEntityView(watched, now = Date.now(), art = loadableArt(watched.attributes?.media_image_url)) {
   const attributes = watched.attributes ?? {};
   const view = {
     id: watched.entity_id,
@@ -182,14 +205,13 @@ export function toEntityView(watched, now = Date.now()) {
   };
   if (watched.entity_type === 'media_player') {
     const duration = finite(attributes.media_duration);
-    const image = typeof attributes.media_image_url === 'string' && attributes.media_image_url ? attributes.media_image_url : null;
     Object.assign(view, {
       title: attributes.media_title || null,
       artist: attributes.media_artist || null,
       album: attributes.media_album || null,
       duration: duration !== null && duration > 0 ? duration : null,
       position: mediaPosition(watched, now),
-      image: image ? createHash('sha256').update(image).digest('hex').slice(0, 16) : null,
+      image: art ? createHash('sha256').update(art).digest('hex').slice(0, 16) : null,
       features: PLAYER_FEATURES.filter((feature) => (watched.features ?? []).includes(feature)),
       volume: finite(attributes.volume),
       muted: typeof attributes.muted === 'boolean' ? attributes.muted : null,
@@ -268,6 +290,7 @@ export class Remote extends EventEmitter {
   #watched = new Map();
   #images = new Map();
   #browseMemory = new Map();
+  #artKeys = new Map();
   #state;
 
   constructor({
@@ -358,13 +381,13 @@ export class Remote extends EventEmitter {
     const entities = {};
     await Promise.all(ui.entityIds.map(async (entityId) => {
       const entity = await this.#entity(entityId);
-      if (entity && WIDGET_ENTITY_TYPES.has(entity.entity_type)) {
-        this.#watched.set(entityId, toWatched(entity, now));
-        entities[entityId] = toEntityView(this.#watched.get(entityId), now);
-      } else {
-        this.#watched.delete(entityId);
-      }
+      if (entity && WIDGET_ENTITY_TYPES.has(entity.entity_type)) this.#watched.set(entityId, toWatched(entity, now));
+      else this.#watched.delete(entityId);
     }));
+    for (const entityId of ui.entityIds) {
+      const watched = this.#watched.get(entityId);
+      if (watched) entities[entityId] = this.#view(watched, now);
+    }
     return { pages: ui.pages, entities };
   }
 
@@ -381,8 +404,8 @@ export class Remote extends EventEmitter {
   async mediaImage(entityId) {
     const watched = this.#watched.get(entityId);
     if (!watched || watched.entity_type !== 'media_player') throw new HttpError(404, 'That player is not on a page that is open.');
-    const url = watched.attributes.media_image_url;
-    if (typeof url !== 'string' || !url) throw new HttpError(404, 'Nothing is showing on that player.');
+    const url = artFor(watched, [...this.#watched.values()]);
+    if (!url) throw new HttpError(404, 'Nothing is showing on that player.');
     const cached = this.#images.get(entityId);
     if (cached?.url === url) return cached;
     const image = { url, ...(await this.#loadImage(url)) };
@@ -536,6 +559,12 @@ export class Remote extends EventEmitter {
       thumb,
       icon,
     };
+  }
+
+  #view(watched, now) {
+    const view = toEntityView(watched, now, watched.entity_type === 'media_player' ? artFor(watched, [...this.#watched.values()]) : null);
+    if (watched.entity_type === 'media_player') this.#artKeys.set(watched.entity_id, view.image);
+    return view;
   }
 
   async #command({ entityId, cmdId, params }) {
@@ -838,7 +867,14 @@ export class Remote extends EventEmitter {
       watched.attributes.media_position = before;
       watched.positionAt = now;
     }
-    this.emit('entity', toEntityView(watched, now));
+    this.emit('entity', this.#view(watched, now));
+    if (watched.entity_type !== 'media_player') return;
+    for (const other of this.#watched.values()) {
+      if (other === watched || other.entity_type !== 'media_player' || loadableArt(other.attributes.media_image_url)) continue;
+      const previous = this.#artKeys.get(other.entity_id);
+      const view = this.#view(other, now);
+      if (view.image !== previous) this.emit('entity', view);
+    }
   }
 
   async #reload() {
