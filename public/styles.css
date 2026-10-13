@@ -431,12 +431,8 @@ svg {
 .meter-fill {
   display: block;
   height: 100%;
-  background: var(--accent-fill);
-  transition: width 0.4s;
-}
-
-.chip.is-warn .meter-fill {
-  background: var(--warn);
+  background: var(--on);
+  transition: width 0.4s, background-color 0.4s;
 }
 
 .problem {

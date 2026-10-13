@@ -1,3 +1,5 @@
+import { batteryFill } from './battery.js';
+
 const $ = (id) => document.getElementById(id);
 
 const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote' };
@@ -314,6 +316,7 @@ function renderStatus(remote) {
     const meter = el('span', 'meter');
     const fill = el('span', 'meter-fill');
     fill.style.width = `${Math.max(0, Math.min(100, remote.battery.capacity))}%`;
+    fill.style.background = batteryFill(remote.battery.capacity);
     meter.append(fill);
     battery.append(meter);
   }

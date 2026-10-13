@@ -16,6 +16,8 @@
   --glow: rgba(211, 174, 105, 0.45);
   --ok: #798987;
   --on: #3ddc84;
+  --caution: #f5b942;
+  --danger: #ff5c5c;
   --warn: #ef767a;
   --font-body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Young Serif", Georgia, "Times New Roman", serif;

@@ -18,6 +18,8 @@
   --glow: rgba(151, 113, 44, 0.35);
   --ok: #2f6b1f;
   --on: #1e8e3e;
+  --caution: #9a6700;
+  --danger: #c62828;
   --warn: #a8361a;
   --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
