@@ -752,6 +752,11 @@ function initPad() {
       setView(state.view === 'pages' ? 'controls' : 'pages');
       return;
     }
+    if (event.key === '0' && state.pager.hasPages && state.view === 'pages') {
+      event.preventDefault();
+      state.pager.home();
+      return;
+    }
     if ((event.key === '[' || event.key === ']') && state.pager.hasPages && state.view === 'pages') {
       event.preventDefault();
       state.pager.step(event.key === '[' ? -1 : 1);
