@@ -26,7 +26,7 @@ export function mapping(entityId) {
 
 export async function startFakeRemote({
   activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {},
-  deviceName = 'Test Den', localization = { language_code: 'en_US', country_code: 'US', measurement_unit: 'METRIC' }, profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [], activityGroups = [],
+  deviceName = 'Test Den', localization = { language_code: 'en_US', country_code: 'US', measurement_unit: 'METRIC' }, profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [], activityGroups = [], pin = '1234', apiKeys = [],
 } = {}) {
   const state = {
     localization,
@@ -35,6 +35,9 @@ export async function startFakeRemote({
     profilePages,
     groups,
     activityGroups,
+    pin,
+    apiKeys,
+    keyRequests: [],
     drivers,
     instances,
     listRequests: [],
@@ -77,7 +80,33 @@ export async function startFakeRemote({
       res.writeHead(200, { 'content-type': found.type });
       return res.end(found.body);
     }
-    if (req.headers.authorization !== `Bearer ${KEY}`) return send(res, 401, { code: 'UNAUTHORIZED', message: 'bad key' });
+    const pinAuth = req.headers.authorization === `Basic ${Buffer.from(`web-configurator:${state.pin}`).toString('base64')}`;
+    const keyAuth = req.headers.authorization === `Bearer ${KEY}`;
+    if (url.pathname === '/api/system' && req.method === 'GET') {
+      return pinAuth || keyAuth ? send(res, 200, { name: deviceName }) : send(res, 401, { code: 'UNAUTHORIZED', message: 'bad credentials' });
+    }
+    const apiKey = url.pathname.match(/^\/api\/auth\/api_keys(?:\/([^/]+))?$/);
+    if (apiKey) {
+      if (!pinAuth) return send(res, 401, { code: 'UNAUTHORIZED', message: 'bad credentials' });
+      state.keyRequests.push(`${req.method} ${url.pathname}`);
+      if (req.method === 'GET' && !apiKey[1]) return send(res, 200, state.apiKeys);
+      if (req.method === 'DELETE' && apiKey[1]) {
+        const before = state.apiKeys.length;
+        state.apiKeys = state.apiKeys.filter((entry) => entry.key_id !== decodeURIComponent(apiKey[1]));
+        return before === state.apiKeys.length ? send(res, 404, { code: 'NOT_FOUND', message: 'No data found' }) : send(res, 200, { code: 'OK', message: 'Deleted' });
+      }
+      if (req.method === 'POST' && !apiKey[1]) {
+        let raw = '';
+        for await (const chunk of req) raw += chunk;
+        const body = JSON.parse(raw);
+        state.keyBody = body;
+        if (state.apiKeys.some((entry) => entry.name === body.name)) return send(res, 422, { code: 'UNPROCESSABLE_ENTITY', message: 'API key name already exists' });
+        const created = { key_id: `key-${state.apiKeys.length + 1}-${Date.now()}`, name: body.name, scopes: body.scopes };
+        state.apiKeys.push(created);
+        return send(res, 201, { ...created, api_key: KEY });
+      }
+    }
+    if (!keyAuth) return send(res, 401, { code: 'UNAUTHORIZED', message: 'bad key' });
     const browsing = url.pathname.match(/^\/api\/entities\/([^/]+)\/media\/browse$/);
     if (browsing && req.method === 'GET') {
       const query = Object.fromEntries(url.searchParams);

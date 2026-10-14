@@ -8,7 +8,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/guyp2k/ucweb/issues</Support>
   <Project>https://github.com/guyp2k/ucweb</Project>
-  <Overview>A web remote for Unfolded Circle Remote 3 and Remote Two. Start and stop activities, use the D-pad, volume and transport buttons, and watch connection, battery and power status live, from a phone or a desktop browser. Sign in with a PIN. Before the first start, put one API key per remote in the config folder under keys (see the project page), then set the PIN with: docker exec -it ucweb npm run set-pin. Keep it on your LAN: never forward its port to the internet.</Overview>
+  <Overview>A web remote for Unfolded Circle Remote 3 and Remote Two. Start and stop activities, use the D-pad, volume and transport buttons, and watch connection, battery and power status live, from a phone or a desktop browser. Sign in with a PIN. After the first start, create an API key on each remote with: docker exec -it ucweb npm run create-key (it asks for each remote's web-configurator PIN), then set the PIN with: docker exec -it ucweb npm run set-pin. Keep it on your LAN: never forward its port to the internet.</Overview>
   <Category>HomeAutomation Tools:Utilities</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/guyp2k/ucweb/main/unraid/ucweb.xml</TemplateURL>
