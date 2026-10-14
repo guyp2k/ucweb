@@ -1,5 +1,6 @@
 import { batteryAge, batteryFill, batteryReading } from './battery.js';
 import { canVibrate, tap } from './haptics.js';
+import { createHold } from './hold.js';
 import { createPager } from './pages.js';
 import { createBrowser } from './browser.js';
 import { createChooser } from './chooser.js';
@@ -890,9 +891,11 @@ function applyButtons() {
   for (const key of document.querySelectorAll('#pad [data-button]')) {
     const button = state.buttons?.get(key.dataset.button);
     key.hidden = state.buttons !== null && button === undefined;
-    key.disabled = button?.mapped !== true;
+    key.disabled = button?.mapped !== true && button?.long !== true;
+    key.classList.toggle('has-long', button?.long === true);
     if (button?.fallback) key.title = 'Not set in this activity: sent to the device the D-pad controls';
-    else key.title = button?.mapped === false ? 'Not set up for this activity' : '';
+    else key.title = button?.mapped === false && !button?.long ? 'Not set up for this activity' : '';
+    if (button?.long) key.title = `${key.title ? `${key.title}. ` : ''}Hold for its long press`;
   }
 }
 
@@ -1223,14 +1226,14 @@ function render() {
   renderSystem(remote);
 }
 
-async function press(button, { repeat = false } = {}) {
+async function press(button, { repeat = false, long = false } = {}) {
   const remote = currentRemote();
   const target = controlledTarget(remote);
   if (!remote || !target || state.inflight.has(button)) return;
   state.inflight.add(button);
   flashLogo({ repeat });
   try {
-    await api(`${targetPath(remote, target)}/buttons/${encodeURIComponent(button)}`, { method: 'POST', body: '{}' });
+    await api(`${targetPath(remote, target)}/buttons/${encodeURIComponent(button)}`, { method: 'POST', body: long ? '{"long":true}' : '{}' });
   } catch (error) {
     toast(error.message);
   } finally {
@@ -1238,19 +1241,46 @@ async function press(button, { repeat = false } = {}) {
   }
 }
 
+function holdFor(button) {
+  return createHold({
+    onShort: () => (state.buttons?.get(button)?.mapped ? press(button) : toast('Hold this button for its long press.')),
+    onLong: () => press(button, { long: true }),
+  });
+}
+
+const hasLong = (button) => state.buttons?.get(button)?.long === true;
+
 function initPad() {
   const pad = $('pad');
   let delayTimer = null;
   let repeatTimer = null;
+  let held = null;
+  let keyHeld = null;
   const stopRepeat = () => {
     clearTimeout(delayTimer);
     clearInterval(repeatTimer);
     delayTimer = null;
     repeatTimer = null;
   };
+  const cancelHolds = () => {
+    held?.cancel();
+    keyHeld?.control.cancel();
+    held = null;
+    keyHeld = null;
+  };
   pad.addEventListener('pointerdown', (event) => {
-    const key = event.target.closest('[data-repeat]');
-    if (!key || key.disabled) return;
+    const pressed = event.target.closest('[data-button]');
+    if (!pressed || pressed.disabled) return;
+    if (hasLong(pressed.dataset.button)) {
+      event.preventDefault();
+      stopRepeat();
+      held?.cancel();
+      held = holdFor(pressed.dataset.button);
+      held.down();
+      return;
+    }
+    const key = pressed.hasAttribute('data-repeat') ? pressed : null;
+    if (!key) return;
     event.preventDefault();
     press(key.dataset.button);
     stopRepeat();
@@ -1258,13 +1288,33 @@ function initPad() {
       repeatTimer = setInterval(() => press(key.dataset.button, { repeat: true }), REPEAT_EVERY_MS);
     }, REPEAT_DELAY_MS);
   });
-  for (const type of ['pointerup', 'pointerleave', 'pointercancel']) pad.addEventListener(type, stopRepeat);
-  window.addEventListener('blur', stopRepeat);
+  pad.addEventListener('pointerup', () => {
+    stopRepeat();
+    held?.up();
+    held = null;
+  });
+  for (const type of ['pointerleave', 'pointercancel']) {
+    pad.addEventListener(type, () => {
+      stopRepeat();
+      held?.cancel();
+      held = null;
+    });
+  }
+  window.addEventListener('blur', () => {
+    stopRepeat();
+    cancelHolds();
+  });
   pad.addEventListener('click', (event) => {
     const key = event.target.closest('[data-button]');
     if (!key || key.disabled) return;
-    if (key.hasAttribute('data-repeat') && event.detail !== 0) return;
+    if ((key.hasAttribute('data-repeat') || hasLong(key.dataset.button)) && event.detail !== 0) return;
+    if (!state.buttons?.get(key.dataset.button)?.mapped) return;
     press(key.dataset.button);
+  });
+  document.addEventListener('keyup', (event) => {
+    if (keyHeld?.key !== event.key) return;
+    keyHeld.control.up();
+    keyHeld = null;
   });
   pad.addEventListener('contextmenu', (event) => event.preventDefault());
 
@@ -1293,6 +1343,13 @@ function initPad() {
     if (!button) return;
     const key = document.querySelector(`#pad [data-button="${button}"]`);
     if (!key || key.hidden || key.disabled) return;
+    if (hasLong(button)) {
+      event.preventDefault();
+      if (event.repeat || keyHeld) return;
+      keyHeld = { key: event.key, control: holdFor(button) };
+      keyHeld.control.down();
+      return;
+    }
     if (event.repeat && !key.hasAttribute('data-repeat')) return;
     event.preventDefault();
     press(button, { repeat: event.repeat });

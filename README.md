@@ -33,7 +33,9 @@ The screenshots use made-up remotes, activities and music.
   plus the installed drivers that have no device set up. Read only; setup data and tokens never leave the server.
 - **Control pad**: D-pad and OK, back, home, menu, volume, mute, channel, play/pause, previous, next, stop and
   record. Each button sends exactly what the activity's own button mapping sends; buttons the activity does not
-  use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. On a
+  use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. A button
+  with a long press in its mapping (marked with a small dot) sends that when held for half a second, and its normal
+  press when let go sooner. On a
   desktop the keyboard works too: arrows, Enter, Backspace, + and -, M and Space. On a phone that can vibrate,
   every press gives a short buzz.
 - **Activity pages**: the pages you built for each activity in the web configurator, laid out on the same grid.
@@ -245,7 +247,7 @@ that is the list of Spotify Connect devices.
 
 | Key | Does |
 |---|---|
-| Arrows, Enter | D-pad and OK |
+| Arrows, Enter | D-pad and OK (hold a key for half a second for a button's long press) |
 | Backspace or Escape | Back |
 | Home | Home |
 | `+` `-` | Volume up and down |

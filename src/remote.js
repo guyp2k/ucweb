@@ -109,18 +109,25 @@ function isMapped(entry) {
   return Boolean(entry.short_press?.entity_id && entry.short_press?.cmd_id);
 }
 
+function longCommand(entry) {
+  const press = entry.long_press;
+  if (!press?.entity_id || !press?.cmd_id) return null;
+  return { entityId: press.entity_id, cmdId: press.cmd_id, params: press.params };
+}
+
 export function resolveButtons(buttonMapping, dpadDevice) {
   const features = new Set(dpadDevice?.entity_type === 'media_player' ? dpadDevice.features ?? [] : []);
   return buttonMapping.map((entry) => {
+    const long = longCommand(entry);
     if (isMapped(entry)) {
       const { entity_id: entityId, cmd_id: cmdId, params } = entry.short_press;
-      return { button: entry.button, command: { entityId, cmdId, params }, fallback: false };
+      return { button: entry.button, command: { entityId, cmdId, params }, fallback: false, long };
     }
     const fallback = FALLBACKS[entry.button];
     if (fallback && fallback.features.some((feature) => features.has(feature))) {
-      return { button: entry.button, command: { entityId: dpadDevice.entity_id, cmdId: fallback.cmdId }, fallback: true };
+      return { button: entry.button, command: { entityId: dpadDevice.entity_id, cmdId: fallback.cmdId }, fallback: true, long };
     }
-    return { button: entry.button, command: null, fallback: false };
+    return { button: entry.button, command: null, fallback: false, long };
   });
 }
 
@@ -212,7 +219,11 @@ export function deviceMapping(entity) {
   const mapping = Array.isArray(entity?.options?.button_mapping) ? entity.options.button_mapping : [];
   return mapping
     .filter((entry) => typeof entry?.button === 'string')
-    .map((entry) => (entry.short_press ? { ...entry, short_press: deviceCommand(entity, entry.short_press) } : entry));
+    .map((entry) => ({
+      ...entry,
+      ...(entry.short_press ? { short_press: deviceCommand(entity, entry.short_press) } : {}),
+      ...(entry.long_press ? { long_press: deviceCommand(entity, entry.long_press) } : {}),
+    }));
 }
 
 const text = (value) => (typeof value === 'string' && value ? value : null);
@@ -562,13 +573,18 @@ export class Remote extends EventEmitter {
 
   async buttons(targetId, kind = 'activity') {
     const mapping = await this.#mapping(targetId, kind);
-    return mapping.map((entry) => ({ button: entry.button, mapped: entry.command !== null, fallback: entry.fallback }));
+    return mapping.map((entry) => ({ button: entry.button, mapped: entry.command !== null, fallback: entry.fallback, long: entry.long !== null }));
   }
 
-  async press(targetId, button, kind = 'activity') {
+  async press(targetId, button, kind = 'activity', { long = false } = {}) {
     const target = await this.#target(targetId, kind);
     const entry = (await this.#mapping(targetId, kind)).find((candidate) => candidate.button === button);
     if (!entry) throw new HttpError(404, `${target.name} has no ${button} button.`);
+    if (long) {
+      if (!entry.long) throw new HttpError(409, `${button} has no long press in ${target.name}.`);
+      await this.#command(entry.long);
+      return;
+    }
     if (!entry.command) throw new HttpError(409, `${button} does nothing in ${target.name}.`);
     await this.#command(entry.command);
   }
