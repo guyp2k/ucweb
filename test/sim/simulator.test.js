@@ -193,10 +193,17 @@ test('an activity group made on the remote becomes a room, and turning the room 
   assert.equal(listed.name, `${RUN} room`);
   assert.deepEqual([...listed.activityIds].sort(), [watch, target].sort());
   await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'ACTIVE', { timeoutMs: 10000, message: 'room ACTIVE' });
+  const running = [];
+  for (const id of listed.activityIds) {
+    if (['ON', 'RUNNING'].includes((await simActivity(id)).attributes.state)) running.push(id);
+  }
+  assert.ok(running.length > 0, 'something in the room is on at the simulator');
   const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/groups/${room}/off`, { method: 'POST', body: '{}' });
   assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).stopped, [ucwebActivity(watch).name]);
-  await waitFor(async () => (await simActivity(watch)).attributes.state === 'OFF', { timeoutMs: 10000, message: 'the room off stopped the activity' });
+  assert.deepEqual((await response.json()).stopped, running.map((id) => ucwebActivity(id).name));
+  for (const id of running) {
+    await waitFor(async () => (await simActivity(id)).attributes.state === 'OFF', { timeoutMs: 10000, message: `the room off stopped ${id}` });
+  }
   await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'OFF', { timeoutMs: 10000, message: 'room OFF live' });
 });
 
