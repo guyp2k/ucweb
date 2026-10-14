@@ -1,6 +1,7 @@
 import { batteryAge, batteryFill, batteryReading } from './battery.js';
 import { canVibrate, tap } from './haptics.js';
 import { createHold } from './hold.js';
+import { snapshotAge } from './camera.js';
 import { createPager } from './pages.js';
 import { createBrowser } from './browser.js';
 import { createChooser } from './chooser.js';
@@ -18,6 +19,7 @@ const RECONNECT_MS = [1000, 2000, 5000, 10000];
 const MAX_PIN_LENGTH = 12;
 const AGE_TICK_MS = 30000;
 const READINESS_TTL_MS = 60000;
+const SNAPSHOT_TICK_MS = 1000;
 
 const POWER_MODES = { NORMAL: 'Awake', IDLE: 'Idle', LOW_POWER: 'Low power', SUSPEND: 'Asleep' };
 const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'Discharging', NOT_CHARGING: 'Not charging', FULL: 'Full' };
@@ -404,6 +406,12 @@ function ageNode(className, at) {
   node.dataset.batteryAt = String(at);
   node.textContent = `Last read ${batteryAge(Date.now() - at)}`;
   return node;
+}
+
+function tickSnapshots() {
+  for (const node of document.querySelectorAll('[data-image-at]')) {
+    node.textContent = `${node.dataset.imagePrefix ?? ''}${snapshotAge(Date.now() - Number(node.dataset.imageAt))}`;
+  }
 }
 
 function tickAges() {
@@ -1508,6 +1516,7 @@ async function boot() {
   initHaptics();
   initThemePicker();
   setInterval(tickAges, AGE_TICK_MS);
+  setInterval(tickSnapshots, SNAPSHOT_TICK_MS);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch((error) => console.warn(`ucweb works without offline start: ${error.message}`));
   }

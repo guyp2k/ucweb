@@ -1,5 +1,6 @@
 import { ICONS, UC_NAMES } from './icons.js';
 import { readinessText } from './readiness.js';
+import { snapshotAge } from './camera.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const TARGET_DELAY_MS = 600;
@@ -325,10 +326,25 @@ export function createDeviceTiles({ onCommand, onPlayer, onOpenPlayer, onOpenDev
         const chosen = await choose({ heading: entity.name, detail: null, options: entity.options, current: entity.option });
         if (chosen && chosen !== entity.option) onCommand(entity.id, 'select_option', chosen);
       });
+    } else if (entity.type === 'media_player' && entity.camera) {
+      node.classList.add('is-camera');
+      lead.replaceChildren(icon('camera'));
+      if (entity.imageAt !== null && entity.imageAt !== undefined) {
+        sub.textContent = `${entity.title ?? entity.source ?? entity.name} · ${snapshotAge(Date.now() - entity.imageAt)}`;
+        sub.dataset.imageAt = String(entity.imageAt);
+        sub.dataset.imagePrefix = `${entity.title ?? entity.source ?? entity.name} · `;
+      }
+      const media = mediaHead(entity, enabled);
+      const picture = el('div', 'dev-camera');
+      picture.append(...media.art.childNodes);
+      body.push(picture);
+      if (media.actions.childElementCount > 0) trailing = media.actions;
     } else if (entity.type === 'media_player') {
       const media = mediaHead(entity, enabled);
       lead = media.art;
       if (media.actions.childElementCount > 0) body.push(media.actions);
+    }
+    if (entity.type === 'media_player') {
       node.classList.add('is-openable');
       node.tabIndex = 0;
       node.setAttribute('role', 'button');

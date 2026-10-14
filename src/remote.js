@@ -49,6 +49,7 @@ const PLAYER_ACTIONS = {
   toggle: { feature: 'toggle' },
 };
 const PLAYER_FEATURES = [...new Set(Object.values(PLAYER_ACTIONS).map((action) => action.feature)), 'browse_media'];
+const PLAYBACK_FEATURES = ['play_pause', 'next', 'previous', 'seek', 'stop', 'volume', 'volume_up_down', 'mute_toggle'];
 const BROWSE_PAGE = 30;
 const MAX_MEDIA_ID = 255;
 const MAX_REMEMBERED = 2000;
@@ -407,6 +408,8 @@ export function toEntityView(watched, now = Date.now(), art = loadableArt(watche
       playActions: (watched.features ?? []).includes('play_media_action') && Array.isArray(attributes.play_media_action)
         ? attributes.play_media_action.filter((how) => typeof how === 'string')
         : [],
+      camera: attributes.media_type === 'video' && !PLAYBACK_FEATURES.some((feature) => (watched.features ?? []).includes(feature)),
+      imageAt: finite(watched.imageAt),
     });
   } else if (watched.entity_type === 'sensor') {
     const unit = attributes.unit ?? watched.options?.custom_unit;
@@ -467,7 +470,7 @@ function sourceList(attributes) {
   return Array.isArray(attributes.source_list) ? attributes.source_list.filter((source) => typeof source === 'string' && source) : [];
 }
 
-function toWatched(entity, now) {
+function toWatched(entity, now, previous = null) {
   return {
     entity_id: entity.entity_id,
     entity_type: entity.entity_type,
@@ -478,6 +481,7 @@ function toWatched(entity, now) {
     features: Array.isArray(entity.features) ? entity.features.filter((feature) => typeof feature === 'string') : [],
     attributes: { ...entity.attributes },
     positionAt: finite(entity.attributes?.media_position) === null ? null : now,
+    imageAt: previous && previous.attributes?.media_image_url === entity.attributes?.media_image_url ? previous.imageAt : null,
   };
 }
 
@@ -638,7 +642,7 @@ export class Remote extends EventEmitter {
     const entities = {};
     await Promise.all(ui.entityIds.map(async (entityId) => {
       const entity = await this.#entity(entityId);
-      if (entity && WIDGET_ENTITY_TYPES.has(entity.entity_type)) this.#watched.set(entityId, toWatched(entity, now));
+      if (entity && WIDGET_ENTITY_TYPES.has(entity.entity_type)) this.#watched.set(entityId, toWatched(entity, now, this.#watched.get(entityId)));
       else this.#watched.delete(entityId);
     }));
     for (const entityId of ui.entityIds) {
@@ -877,7 +881,7 @@ export class Remote extends EventEmitter {
       const list = await this.#pagedList('/api/entities');
       const now = Date.now();
       for (const entity of list) {
-        if (typeof entity?.entity_id === 'string' && typeof entity.entity_type === 'string') this.#watched.set(entity.entity_id, toWatched(entity, now));
+        if (typeof entity?.entity_id === 'string' && typeof entity.entity_type === 'string') this.#watched.set(entity.entity_id, toWatched(entity, now, this.#watched.get(entity.entity_id)));
       }
     })().catch((error) => {
       this.#entityLoad = null;
@@ -1330,6 +1334,7 @@ export class Remote extends EventEmitter {
       watched.options = newState.options;
       this.#forgetDevice(entityId);
     }
+    if (attributes.media_image_url !== undefined && attributes.media_image_url !== watched.attributes.media_image_url) watched.imageAt = now;
     Object.assign(watched.attributes, attributes);
     if (finite(attributes.media_position) !== null) watched.positionAt = now;
     else if (attributes.state !== undefined && before !== null) {
