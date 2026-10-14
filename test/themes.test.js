@@ -81,9 +81,9 @@ for (const theme of themes) {
   });
 }
 
-test('an activity or a room that is on shows its dot in the theme green', async () => {
+test('an activity that is on shows its dot in the theme green', async () => {
   const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
-  const rule = css.match(/:is\(\.tile, \.control-title, \.room\)\[data-state="ON"\] \.badge::before \{([^}]*)\}/);
+  const rule = css.match(/:is\(\.tile, \.control-title\)\[data-state="ON"\] \.badge::before \{([^}]*)\}/);
   assert.ok(rule, 'styles.css has no rule for the ON dot');
   assert.match(rule[1], /background: var\(--on\);/);
 });

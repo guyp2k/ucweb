@@ -26,7 +26,7 @@ export function mapping(entityId) {
 
 export async function startFakeRemote({
   activities = [activity('act.tv', 'Watch TV')], buttonMappings = {}, batteryError = false, entities = {}, uis = {}, art = {}, browse = {},
-  deviceName = 'Test Den', localization = { language_code: 'en_US', country_code: 'US', measurement_unit: 'METRIC' }, profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [], activityGroups = [], pin = '1234', apiKeys = [],
+  deviceName = 'Test Den', localization = { language_code: 'en_US', country_code: 'US', measurement_unit: 'METRIC' }, profiles = [], activeProfile = null, profilePages = {}, groups = {}, drivers = [], instances = [], pin = '1234', apiKeys = [],
 } = {}) {
   const state = {
     localization,
@@ -34,7 +34,6 @@ export async function startFakeRemote({
     activeProfile,
     profilePages,
     groups,
-    activityGroups,
     pin,
     apiKeys,
     keyRequests: [],
@@ -133,20 +132,6 @@ export async function startFakeRemote({
     if (readiness && req.method === 'GET') {
       const found = state.readiness?.[decodeURIComponent(readiness[1])];
       return found ? send(res, 200, found) : send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
-    }
-    if (url.pathname.startsWith('/api/activity_groups') && req.method === 'GET' && state.activityGroups === null) {
-      return send(res, 404, { code: 'NOT_FOUND', message: 'Not found' });
-    }
-    const memberOf = (id) => state.activities.find((candidate) => candidate.entity_id === id);
-    if (url.pathname === '/api/activity_groups' && req.method === 'GET') {
-      return paged(state.activityGroups.map((group) => ({ group_id: group.group_id, name: group.name, icon: 'uc:layer-group', activity_count: group.activity_ids.length, state: 'OFF' })));
-    }
-    const activityGroup = url.pathname.match(/^\/api\/activity_groups\/([^/]+)$/);
-    if (activityGroup && req.method === 'GET') {
-      const found = state.activityGroups.find((group) => group.group_id === decodeURIComponent(activityGroup[1]));
-      if (!found) return send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
-      const activities = found.activity_ids.map((id) => ({ entity_id: id, name: memberOf(id)?.name ?? { en: id }, state: memberOf(id)?.attributes.state ?? 'OFF' }));
-      return send(res, 200, { group_id: found.group_id, name: found.name, activities, state: 'OFF' });
     }
     if (url.pathname === '/api/intg/drivers' && req.method === 'GET') return paged(state.drivers);
     if (url.pathname === '/api/intg/instances' && req.method === 'GET') return paged(state.instances);
