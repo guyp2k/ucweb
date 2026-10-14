@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
-import { deviceInterface, Remote, toEntityView, toIntegrations, toProfilePages } from '../src/remote.js';
+import { deviceInterface, Remote, toEntityView, toIntegrations, toProfilePages, toReadiness } from '../src/remote.js';
 import { activity, HOSTNAME, KEY, startFakeRemote, waitFor } from './helpers/fake-remote.js';
 
 let keysDir;
@@ -394,4 +394,58 @@ test('every command ucweb can send is one the remote lists in its entity command
   const sent = [...new Set(fake.state.commands.map((command) => command.body.cmd_id))];
   assert.ok(sent.length >= 30, `sent ${sent.length} kinds of command`);
   assert.deepEqual(sent.filter((cmdId) => !known.has(cmdId)), []);
+});
+
+const readinessReport = (overrides) => ({ entity_id: 'macro.night', entity_type: 'macro', ready: true, total_steps: 0, blocked_steps: 0, skipped_steps: 0, aborting_steps: 0, steps: [], ...overrides });
+const step = (name, reason, extra = {}) => ({ type: 'command', entity_id: `${name.toLowerCase().replace(/\W/g, '_')}.id`, name, cmd_id: 'x.y', ready: !reason || reason.code === 'ENTITY_NOT_FOUND', skipped: reason?.code === 'ENTITY_NOT_FOUND', reason, ...extra });
+
+test('a macro that would run all its steps is ready, with its step count', () => {
+  const report = readinessReport({ total_steps: 7, steps: Array.from({ length: 7 }, (_, i) => step(`Step ${i}`)) });
+  assert.deepEqual(toReadiness(report), { verdict: 'ready', steps: 7, runs: 7, problems: [] });
+});
+
+test('a macro with no steps, or whose every step targets something deleted, runs nothing even though the remote calls it ready', () => {
+  assert.deepEqual(toReadiness(readinessReport({})), { verdict: 'nothing', steps: 0, runs: 0, problems: [] });
+  const gone = readinessReport({
+    total_steps: 1,
+    skipped_steps: 1,
+    steps: [step('Den ATV', { code: 'ENTITY_NOT_FOUND', message: "entity 'Den ATV' (uc_appletv_driver.main.96:68) no longer exists: the step is skipped", group_id: 'ENTITY_NOT_FOUND:uc_appletv_driver.main.96:68' })],
+  });
+  assert.deepEqual(toReadiness(gone), { verdict: 'nothing', steps: 1, runs: 0, problems: [{ text: 'Den ATV no longer exists', blocking: false, steps: 1 }] });
+});
+
+test('a blocked macro names each cause once, however many steps it blocks, in plain words', () => {
+  const offline = { code: 'INTEGRATION_NOT_CONNECTED', message: 'integration hue.main is not connected', group_id: 'INTEGRATION_NOT_CONNECTED:hue.main' };
+  const report = readinessReport({
+    ready: false,
+    total_steps: 4,
+    blocked_steps: 3,
+    aborting_steps: 1,
+    steps: [step('Den Lamp', offline), step('Den Strip', offline), step('Den Ceiling', offline), step('Projector', { code: 'IR_EMITTER_NOT_AVAILABLE', message: 'dock offline', group_id: 'IR_EMITTER_NOT_AVAILABLE:uc.dock.den' })],
+  });
+  assert.deepEqual(toReadiness(report), {
+    verdict: 'blocked',
+    steps: 4,
+    runs: 4,
+    problems: [
+      { text: "Den Lamp's integration is not connected", blocking: true, steps: 3 },
+      { text: 'The IR emitter for Projector is not available', blocking: true, steps: 1 },
+    ],
+  });
+});
+
+test('a step left out because its device is already in that state is not a problem, and an unknown reason keeps the remote\'s own words', () => {
+  const report = readinessReport({
+    total_steps: 2,
+    steps: [step('TV', { code: 'ALREADY_IN_STATE', message: 'already on', group_id: 'a' }, { ready: true }), step('Amp', { code: 'SOMETHING_NEW', message: 'the amp is shy', group_id: 'b' }, { ready: true })],
+  });
+  assert.deepEqual(toReadiness(report).problems, [{ text: 'the amp is shy', blocking: false, steps: 1 }]);
+});
+
+test('a macro\'s readiness is read from the remote for macros only', async () => {
+  await connect();
+  fake.state.readiness = { 'macro.night': readinessReport({ total_steps: 2, steps: [step('A'), step('B')] }) };
+  assert.deepEqual(await remote.macroReadiness('macro.night'), { verdict: 'ready', steps: 2, runs: 2, problems: [] });
+  await assert.rejects(remote.macroReadiness('light.lamp'), { status: 404, message: 'Test Den has no macro light.lamp.' });
+  await assert.rejects(remote.macroReadiness('macro.gone'), { status: 404 });
 });

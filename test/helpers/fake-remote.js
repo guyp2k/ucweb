@@ -129,6 +129,11 @@ export async function startFakeRemote({
       return send(res, 200, items.slice((page - 1) * limit, page * limit), { 'pagination-count': String(items.length) });
     };
     if (url.pathname === '/api/entities' && req.method === 'GET') return paged([...state.activities, ...Object.values(state.entities)]);
+    const readiness = url.pathname.match(/^\/api\/macros\/([^/]+)\/readiness$/);
+    if (readiness && req.method === 'GET') {
+      const found = state.readiness?.[decodeURIComponent(readiness[1])];
+      return found ? send(res, 200, found) : send(res, 404, { code: 'NOT_FOUND', message: 'No data found' });
+    }
     if (url.pathname.startsWith('/api/activity_groups') && req.method === 'GET' && state.activityGroups === null) {
       return send(res, 404, { code: 'NOT_FOUND', message: 'Not found' });
     }

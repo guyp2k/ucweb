@@ -3706,6 +3706,11 @@ body.has-nav-open {
   white-space: nowrap;
 }
 
+.dev-sub.is-warn {
+  color: var(--warn);
+  white-space: normal;
+}
+
 .dev-switch {
   position: relative;
   flex: none;

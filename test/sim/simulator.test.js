@@ -27,6 +27,7 @@ let watch;
 let target;
 let page;
 let room;
+const macros = [];
 
 async function sim(method, pathname, body) {
   const headers = { authorization: SIM_AUTH, accept: 'application/json' };
@@ -91,6 +92,7 @@ after(async () => {
   remote?.stop();
   if (server) await new Promise((resolve) => server.close(resolve));
   if (room) await sim('DELETE', `/api/activity_groups/${room}`).catch(() => {});
+  for (const id of macros) await sim('DELETE', `/api/macros/${id}`).catch(() => {});
   for (const made of await sim('GET', '/api/auth/api_keys').catch(() => [])) {
     if (made.name === 'ucweb') await sim('DELETE', `/api/auth/api_keys/${made.key_id}`).catch(() => {});
   }
@@ -277,6 +279,28 @@ test('a button with only a long press is listed as such, and holding it runs the
   assert.equal((await simActivity(target)).attributes.state, 'OFF');
   assert.equal((await ucweb(route, { method: 'POST', body: '{"long":true}' })).status, 200);
   await waitFor(async () => (await simActivity(target)).attributes.state === 'ON', { timeoutMs: 10000, message: 'the long press started the target' });
+});
+
+test('a macro made on the remote says whether it would do anything, including after its target is deleted', async () => {
+  const doomed = (await sim('POST', '/api/activities', { name: { en: `${RUN} doomed` } })).entity_id;
+  const empty = (await sim('POST', '/api/macros', { name: { en: `${RUN} empty macro` } })).entity_id;
+  const pointed = (await sim('POST', '/api/macros', { name: { en: `${RUN} pointed macro` } })).entity_id;
+  macros.push(empty, pointed);
+  await sim('PATCH', `/api/macros/${pointed}`, { options: { entity_ids: [doomed], sequence: [{ type: 'command', command: { entity_id: doomed, cmd_id: 'activity.start' } }] } });
+  const readiness = async (id) => {
+    const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/entities/${id}/readiness`);
+    return response.status === 200 ? response.json() : null;
+  };
+  const emptyView = await waitFor(() => readiness(empty), { timeoutMs: 10000, message: 'ucweb lists the new macro' });
+  assert.deepEqual(emptyView, { verdict: 'nothing', steps: 0, runs: 0, problems: [] });
+  await sim('DELETE', `/api/activities/${doomed}`);
+  const gone = await readiness(pointed);
+  assert.equal(gone.verdict, 'nothing');
+  assert.equal(gone.runs, 0);
+  assert.equal(gone.problems.length, 1);
+  assert.match(gone.problems[0].text, / no longer exists$/);
+  assert.equal(gone.problems[0].blocking, false);
+  assert.equal((await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/entities/${watch}/readiness`)).status, 404);
 });
 
 test('renaming an activity on the remote shows up in ucweb live', async () => {

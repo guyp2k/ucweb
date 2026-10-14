@@ -17,6 +17,7 @@ const REPEAT_EVERY_MS = 180;
 const RECONNECT_MS = [1000, 2000, 5000, 10000];
 const MAX_PIN_LENGTH = 12;
 const AGE_TICK_MS = 30000;
+const READINESS_TTL_MS = 60000;
 
 const POWER_MODES = { NORMAL: 'Awake', IDLE: 'Idle', LOW_POWER: 'Low power', SUSPEND: 'Asleep' };
 const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'Discharging', NOT_CHARGING: 'Not charging', FULL: 'Full' };
@@ -73,6 +74,7 @@ const state = {
   systemBusy: false,
   haptics: true,
   roomsBusy: new Set(),
+  readiness: new Map(),
 };
 
 function load(key) {
@@ -312,7 +314,9 @@ function connect() {
       return;
     } else if (message.type === 'integrations') {
       const remote = state.remotes.get(message.remote);
+      forgetReadiness(message.remote);
       if (remote && state.integrations.has(remote.id)) loadIntegrations(remote);
+      if (remote?.id === state.remoteId) render();
       return;
     }
     const shownPages = state.pagesKey;
@@ -864,6 +868,30 @@ async function loadIntegrations(remote) {
     state.integrations.set(remote.id, { status: 'error', error: error.message, data: before?.data ?? null });
   }
   if (remote.id === state.remoteId) render();
+}
+
+function readinessFor(remoteId, entityId) {
+  const key = `${remoteId}\n${entityId}`;
+  const entry = state.readiness.get(key);
+  if (!entry || (entry.status !== 'loading' && performance.now() - entry.at > READINESS_TTL_MS)) loadReadiness(remoteId, entityId, key);
+  return entry?.view ?? null;
+}
+
+async function loadReadiness(remoteId, entityId, key) {
+  state.readiness.set(key, { status: 'loading', view: state.readiness.get(key)?.view ?? null, at: performance.now() });
+  let view = null;
+  try {
+    view = await api(`/api/remotes/${encodeURIComponent(remoteId)}/entities/${encodeURIComponent(entityId)}/readiness`);
+  } catch (error) {
+    console.warn(`Could not check whether ${entityId} can run: ${error.message}`);
+  }
+  state.readiness.set(key, { status: view ? 'ready' : 'error', view, at: performance.now() });
+  const entity = entityOf(remoteId, entityId);
+  if (entity) applyEntity(remoteId, entity);
+}
+
+function forgetReadiness(remoteId) {
+  for (const key of state.readiness.keys()) if (key.startsWith(`${remoteId}\n`)) state.readiness.delete(key);
 }
 
 function applyEntity(remoteId, entity) {
@@ -1469,6 +1497,7 @@ async function boot() {
     onOpenDevice: (entityId) => focusControl({ kind: 'device', id: entityId }),
     imageUrl: (entityId, version) => imageUrl(state.remoteId, entityId, version),
     choose: (options) => state.chooser.choose(options),
+    readiness: (entityId) => readinessFor(state.remoteId, entityId),
   });
   initLogin();
   initNav();

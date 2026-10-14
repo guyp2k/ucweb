@@ -44,6 +44,7 @@ before(async () => {
       'media.tv': { entity_id: 'media.tv', entity_type: 'media_player', name: { en: 'TV' }, features: ['play_pause', 'next'], attributes: { state: 'PLAYING' } },
       'sensor.vol': { entity_id: 'sensor.vol', entity_type: 'sensor', name: { en: 'Volume' }, attributes: { state: 'ON', value: '30', unit: 'dB' } },
       'light.desk': { entity_id: 'light.desk', entity_type: 'light', name: { en: 'Desk' }, features: ['dim'], attributes: { state: 'OFF' } },
+      'macro.night': { entity_id: 'macro.night', entity_type: 'macro', name: { en: 'Night' }, features: ['run'], attributes: { state: 'UNKNOWN' } },
       'remote.amp': {
         entity_id: 'remote.amp', entity_type: 'remote', name: { en: 'Amp' }, features: ['send_cmd'], attributes: { state: 'ON' },
         options: { button_mapping: [{ button: 'MUTE', short_press: { cmd_id: 'mute' } }] },
@@ -336,7 +337,7 @@ test('a signed-in browser reads the remote\'s pages, entities and integrations, 
   assert.deepEqual(profile.pages, [{ id: 'lights', name: 'Lights', items: [{ entityId: 'light.desk', type: 'light' }] }]);
   assert.equal(profile.entities['light.desk'].name, 'Desk');
   const { entities } = await (await authed(`${at}/entities`)).json();
-  assert.deepEqual(entities.map((entity) => entity.id), ['remote.amp', 'light.desk', 'media.tv', 'sensor.vol']);
+  assert.deepEqual(entities.map((entity) => entity.id), ['remote.amp', 'light.desk', 'macro.night', 'media.tv', 'sensor.vol']);
   const integrations = await authed(`${at}/integrations`);
   const body = await integrations.text();
   assert.equal(integrations.status, 200);
@@ -430,4 +431,14 @@ test('a long press goes through the button route with long true, and anything bu
   assert.deepEqual(await refused.json(), { error: 'VOLUME_UP has no long press in Watch TV.' });
   assert.equal((await authed(route, { method: 'POST', body: '{"long":false}' })).status, 200);
   assert.deepEqual(fake.state.commands, [{ entityId: 'media.tv', body: { cmd_id: 'media_player.volume_up' } }]);
+});
+
+test('a signed-in browser reads a macro\'s readiness, and only for a macro', async () => {
+  fake.state.readiness = { 'macro.night': { ready: true, total_steps: 0, skipped_steps: 0, steps: [] } };
+  const route = (id) => `/api/remotes/${encodeURIComponent(fake.address)}/entities/${id}/readiness`;
+  assert.equal((await fetch(`${base}${route('macro.night')}`)).status, 401);
+  const response = await authed(route('macro.night'));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { verdict: 'nothing', steps: 0, runs: 0, problems: [] });
+  assert.equal((await authed(route('light.desk'))).status, 404);
 });
