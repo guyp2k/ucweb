@@ -1,4 +1,4 @@
-import { batteryFill } from './battery.js';
+import { batteryAge, batteryFill, batteryReading } from './battery.js';
 import { canVibrate, tap } from './haptics.js';
 import { createPager } from './pages.js';
 import { createBrowser } from './browser.js';
@@ -15,6 +15,7 @@ const REPEAT_DELAY_MS = 400;
 const REPEAT_EVERY_MS = 180;
 const RECONNECT_MS = [1000, 2000, 5000, 10000];
 const MAX_PIN_LENGTH = 12;
+const AGE_TICK_MS = 30000;
 
 const POWER_MODES = { NORMAL: 'Awake', IDLE: 'Idle', LOW_POWER: 'Low power', SUSPEND: 'Asleep' };
 const BATTERY_STATUS = { CHARGING: 'Charging', DISCHARGING: 'Discharging', NOT_CHARGING: 'Not charging', FULL: 'Full' };
@@ -381,10 +382,27 @@ function selectRemote(id) {
   render();
 }
 
-function batteryText(battery, problem) {
-  if (!battery) return problem ? 'Not readable' : 'Unknown';
-  const status = BATTERY_STATUS[battery.status] ?? battery.status;
-  return status ? `${battery.capacity}% ${status.toLowerCase()}` : `${battery.capacity}%`;
+function batteryText(reading, problem) {
+  if (!reading) return problem ? 'Not readable' : 'Unknown';
+  if (reading.stale) return `${reading.capacity}%`;
+  const status = BATTERY_STATUS[reading.status] ?? reading.status;
+  return status ? `${reading.capacity}% ${status.toLowerCase()}` : `${reading.capacity}%`;
+}
+
+function ageNode(className, at) {
+  const node = el('span', className);
+  node.dataset.batteryAt = String(at);
+  node.textContent = `Last read ${batteryAge(Date.now() - at)}`;
+  return node;
+}
+
+function tickAges() {
+  for (const node of document.querySelectorAll('[data-battery-at]')) {
+    node.textContent = `Last read ${batteryAge(Date.now() - Number(node.dataset.batteryAt))}`;
+  }
+  for (const tab of document.querySelectorAll('.remote-tab[data-battery-at]')) {
+    tab.title = `${tab.dataset.label}, battery last read ${batteryAge(Date.now() - Number(tab.dataset.batteryAt))}`;
+  }
 }
 
 function renderTabs() {
@@ -396,9 +414,16 @@ function renderTabs() {
     const dot = el('span', `dot ${remote.online ? 'is-online' : 'is-offline'}`);
     dot.setAttribute('aria-hidden', 'true');
     tab.append(dot, el('span', 'remote-tab-name', remote.name ?? remote.address));
-    tab.append(el('span', 'remote-tab-battery', remote.battery ? `${remote.battery.capacity}%` : 'n/a'));
-    const batteryNote = remote.battery ? '' : ', battery level not available right now';
-    tab.title = `${remote.name ?? remote.address} is ${remote.online ? 'online' : 'offline'}${batteryNote}`;
+    const reading = batteryReading(remote);
+    tab.append(el('span', `remote-tab-battery${reading?.stale ? ' is-stale' : ''}`, reading ? `${reading.capacity}%` : 'n/a'));
+    const label = `${remote.name ?? remote.address} is ${remote.online ? 'online' : 'offline'}`;
+    if (reading?.stale) {
+      tab.dataset.label = label;
+      tab.dataset.batteryAt = String(reading.at);
+      tab.title = `${label}, battery last read ${batteryAge(Date.now() - reading.at)}`;
+    } else {
+      tab.title = reading ? label : `${label}, battery level not available right now`;
+    }
     tab.addEventListener('click', () => selectRemote(id));
     return tab;
   });
@@ -418,14 +443,16 @@ function renderStatus(remote) {
     return;
   }
   const connection = statusChip('Connection', remote.online ? 'Online' : 'Offline', remote.online ? 'is-ok' : 'is-warn');
-  const battery = statusChip('Battery', batteryText(remote.battery, remote.batteryProblem), remote.battery?.capacity <= 15 || remote.batteryProblem ? 'is-warn' : '');
+  const reading = batteryReading(remote);
+  const battery = statusChip('Battery', batteryText(reading, remote.batteryProblem), reading?.capacity <= 15 || remote.batteryProblem ? 'is-warn' : '');
+  if (reading?.stale) battery.append(ageNode('chip-note', reading.at));
   if (remote.batteryProblem) battery.append(el('span', 'chip-note', 'The remote answers with an error when asked for its battery level.'));
   if (remote.batteryProblem) battery.title = remote.batteryProblem;
-  if (remote.battery) {
-    const meter = el('span', 'meter');
+  if (reading) {
+    const meter = el('span', `meter${reading.stale ? ' is-stale' : ''}`);
     const fill = el('span', 'meter-fill');
-    fill.style.width = `${Math.max(0, Math.min(100, remote.battery.capacity))}%`;
-    fill.style.background = batteryFill(remote.battery.capacity);
+    fill.style.width = `${Math.max(0, Math.min(100, reading.capacity))}%`;
+    fill.style.background = batteryFill(reading.capacity);
     meter.append(fill);
     battery.append(meter);
   }
@@ -1332,6 +1359,7 @@ async function boot() {
   initPad();
   initSystem();
   initHaptics();
+  setInterval(tickAges, AGE_TICK_MS);
   try {
     await initThemes();
     const session = await api('/api/session');

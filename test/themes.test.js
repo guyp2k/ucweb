@@ -92,7 +92,7 @@ test('the battery meter takes its color from the battery level, not the warning 
   const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
   assert.doesNotMatch(css, /\.chip\.is-warn \.meter-fill/);
   const app = await readFile(path.join(publicDir, 'app.js'), 'utf8');
-  assert.match(app, /fill\.style\.background = batteryFill\(remote\.battery\.capacity\);/);
+  assert.match(app, /fill\.style\.background = batteryFill\(reading\.capacity\);/);
 });
 
 test('the README and the Unraid template list every theme', async () => {
