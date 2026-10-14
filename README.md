@@ -55,7 +55,8 @@ The screenshots use made-up remotes, activities and music.
   pause, previous, next, stop, shuffle, repeat, volume and source. It offers only the controls that player reports it
   supports, and the server checks every command against that list before sending it.
 - **Live status**: connection, battery level and charging, power supply, power mode (awake, idle, low power,
-  asleep) and the device's model and firmware, updated as they change.
+  asleep) and the device's model and firmware, updated as they change. When the battery cannot be read right now,
+  or the remote is offline, the last reading is shown dimmed with its age ("Last read 4 min ago") instead of n/a.
 - **Several remotes**: switch between them at the top of the page.
 - **PIN sign-in**: one PIN for the whole app, kept as a scrypt hash. A browser stays signed in for 30 days.
 - **Themes**: Miyara (the default), Pat's Blue, Original, Obsidian & Copper, Roon Dark, Roon Light, Dark Orange,
@@ -285,7 +286,7 @@ keys, PIN and sign-ins are kept in `/config`.
 | "The API key was rejected" | The key was deleted on the remote or the remote was reset. Run `create-api-key.sh <ip> --replace` and copy the new file over. |
 | "... did not answer" | Check the IP in `UC_REMOTES` and that the server can reach the remote (same network or a firewall rule between VLANs). A remote that is asleep off its dock drops off Wi-Fi; ucweb reconnects on its own when it wakes. |
 | The status bar says **Low power** | Normal. A docked remote dozes with its screen off but stays connected and controllable. |
-| Battery says **Not readable** | Some firmware answers battery requests with an error while docked in low power. ucweb asks again every minute and clears it as soon as an answer comes. In testing, shortening the remote's sleep timeout from 10 to 5 minutes made it go away. |
+| Battery says **Not readable**, or shows a dimmed level with **Last read ... ago** | Some firmware answers battery requests with an error while docked in low power. ucweb shows the last level it read (until the container restarts), asks again every minute and goes back to the live level as soon as an answer comes. In testing, shortening the remote's sleep timeout from 10 to 5 minutes made it go away. |
 | "No PIN is set yet" | Run `docker exec -it ucweb npm run set-pin`, then reload the page. |
 | Sign-in is refused even with the right PIN | Too many wrong PINs: a browser waits 30 seconds after five misses, doubling up to 15 minutes, and 30 misses in 15 minutes lock sign-in for everyone until the window passes. |
 | A pad button is dimmed | That button is not mapped in the activity. Map it in the web configurator under the activity's button mapping. |

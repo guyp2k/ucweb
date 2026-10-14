@@ -439,6 +439,11 @@ svg {
   transition: width 0.4s, background-color 0.4s;
 }
 
+.meter.is-stale .meter-fill,
+.remote-tab-battery.is-stale {
+  opacity: 0.45;
+}
+
 .problem {
   grid-column: 1 / -1;
   margin: 0;

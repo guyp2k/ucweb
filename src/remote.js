@@ -490,6 +490,7 @@ export class Remote extends EventEmitter {
       online: false,
       problem: null,
       battery: null,
+      lastBattery: null,
       batteryProblem: null,
       powerSupply: null,
       powerMode: null,
@@ -1025,6 +1026,7 @@ export class Remote extends EventEmitter {
     this.#uis.clear();
     this.#entityLoad = null;
     this.#state.battery = toBattery(battery.data);
+    this.#recordBattery();
     this.#state.batteryProblem = battery.problem;
     this.#state.powerSupply = power.data?.power_supply ?? battery.data?.power_supply ?? null;
     this.#state.powerMode = power.data?.mode ?? null;
@@ -1045,8 +1047,13 @@ export class Remote extends EventEmitter {
     if (battery) {
       this.#state.battery = battery;
       this.#state.batteryProblem = null;
+      this.#recordBattery();
     }
     if (typeof data?.power_supply === 'boolean') this.#state.powerSupply = data.power_supply;
+  }
+
+  #recordBattery() {
+    if (this.#state.battery) this.#state.lastBattery = { ...this.#state.battery, at: Date.now() };
   }
 
   #openSocket() {

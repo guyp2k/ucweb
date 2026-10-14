@@ -100,6 +100,36 @@ test('an unreadable battery is read again on the power check until it answers', 
   assert.equal(remote.snapshot().batteryProblem, null);
 });
 
+test('every battery reading is kept as the last one with the time it was read', async () => {
+  const before = Date.now();
+  await connect();
+  const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
+  assert.equal(snapshot.lastBattery.capacity, 80);
+  assert.equal(snapshot.lastBattery.status, 'DISCHARGING');
+  assert.ok(snapshot.lastBattery.at >= before && snapshot.lastBattery.at <= Date.now(), `read at ${snapshot.lastBattery.at}`);
+  fake.emit('battery_status', { capacity: 61, status: 'CHARGING', power_supply: true });
+  await waitFor(() => remote.snapshot().lastBattery.capacity === 61, { message: 'newer reading' });
+  assert.ok(remote.snapshot().lastBattery.at >= snapshot.lastBattery.at);
+});
+
+test('a battery that turns unreadable is unknown now but keeps the last reading and its time', async () => {
+  await connect();
+  const first = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
+  assert.equal(first.lastBattery?.capacity, 80);
+  fake.state.batteryError = true;
+  fake.emit('power_mode_change', { mode: 'NORMAL', wakeup: true });
+  const after = await waitFor(() => remote.snapshot().batteryProblem && remote.snapshot(), { message: 'battery unreadable' });
+  assert.equal(after.battery, null);
+  assert.deepEqual(after.lastBattery, first.lastBattery);
+});
+
+test('a remote that never gave a battery reading has no last reading', async () => {
+  await connect({ batteryError: true });
+  const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
+  assert.equal(snapshot.battery, null);
+  assert.equal(snapshot.lastBattery, null);
+});
+
 test('every activity is loaded across pages of 100', async () => {
   const many = Array.from({ length: 150 }, (_, i) => activity(`act.${String(i).padStart(3, '0')}`, `Activity ${String(i).padStart(3, '0')}`));
   await connect({ activities: many });
