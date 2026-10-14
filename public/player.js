@@ -1,4 +1,5 @@
 import { ICONS } from './icons.js';
+import { snapshotAge } from './camera.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const CLOSE_MS = 220;
@@ -148,7 +149,7 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
     if (key === current.imageKey && art.childElementCount > 0) return;
     current.imageKey = key;
     if (!hasArt) {
-      art.replaceChildren(icon('music'));
+      art.replaceChildren(icon(entity.camera ? 'camera' : 'music'));
       backdrop.replaceChildren();
       return;
     }
@@ -158,7 +159,7 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
     image.src = src;
     image.addEventListener('load', () => image.classList.add('is-loaded'), { once: true });
     image.addEventListener('error', () => {
-      art.replaceChildren(icon('music'));
+      art.replaceChildren(icon(entity.camera ? 'camera' : 'music'));
       backdrop.replaceChildren();
     }, { once: true });
     art.replaceChildren(image);
@@ -172,12 +173,18 @@ export function createPlayer(dialog, { onCommand, imageUrl }) {
     const { entity } = current;
     if (!entity) return;
     paintArt();
+    const camera = entity.camera === true;
+    dialog.classList.toggle('is-camera', camera);
     source.textContent = entity.name;
     title.textContent = entity.title ?? entity.name;
-    artist.textContent = entity.artist ?? '';
+    const age = camera && entity.imageAt !== null && entity.imageAt !== undefined;
+    artist.textContent = age ? snapshotAge(Date.now() - entity.imageAt) : entity.artist ?? '';
+    if (age) artist.dataset.imageAt = String(entity.imageAt);
+    else delete artist.dataset.imageAt;
     album.textContent = entity.album ?? '';
-    artist.hidden = !entity.artist;
+    artist.hidden = !age && !entity.artist;
     album.hidden = !entity.album;
+    state.hidden = camera;
     state.textContent = STATES[entity.state] ?? entity.state ?? '';
     state.dataset.state = entity.state ?? 'UNKNOWN';
     const playing = entity.state === 'PLAYING';

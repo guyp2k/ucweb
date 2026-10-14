@@ -2312,6 +2312,21 @@ a.system-button {
   transition: opacity 0.4s;
 }
 
+.player.is-camera .player-art {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.player.is-camera .player-art-image,
+.page-media.is-camera .media-art-image {
+  object-fit: contain;
+}
+
+.page-media.is-camera .media-art {
+  width: 100%;
+  aspect-ratio: auto;
+}
+
 .player-art-image.is-loaded {
   opacity: 1;
 }
@@ -3680,6 +3695,33 @@ body.has-nav-open {
 
 .dev-art img.is-loaded {
   opacity: 1;
+}
+
+.dev-camera {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg) 85%, black);
+}
+
+.dev-camera img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.dev-camera img.is-loaded {
+  opacity: 1;
+}
+
+.dev-camera svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.5;
 }
 
 .dev-text {

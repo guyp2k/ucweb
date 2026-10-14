@@ -449,3 +449,56 @@ test('a macro\'s readiness is read from the remote for macros only', async () =>
   await assert.rejects(remote.macroReadiness('light.lamp'), { status: 404, message: 'Test Den has no macro light.lamp.' });
   await assert.rejects(remote.macroReadiness('macro.gone'), { status: 404 });
 });
+
+const cctv = (features = ['on_off', 'select_source', 'media_image_url', 'media_title', 'media_type'], attributes = {}) => ({
+  entity_id: 'cctv.cams', entity_type: 'media_player', name: { en: 'Security Cameras' }, features,
+  attributes: { state: 'PLAYING', media_type: 'video', media_title: 'DW', source: 'DW', source_list: ['FD', 'DW'], media_image_url: 'data:image/jpeg;base64,AAAA', ...attributes },
+});
+
+test('a video player that only shows pictures and switches sources is a camera', () => {
+  assert.equal(toEntityView(cctv()).camera, true);
+});
+
+test('a player with any transport or volume control, or one that is not video, is not a camera', () => {
+  for (const feature of ['play_pause', 'next', 'previous', 'seek', 'stop', 'volume', 'volume_up_down', 'mute_toggle']) {
+    assert.equal(toEntityView(cctv(['on_off', 'select_source', feature])).camera, false, feature);
+  }
+  assert.equal(toEntityView(cctv(undefined, { media_type: 'music' })).camera, false);
+  assert.equal(toEntityView(cctv(undefined, { media_type: undefined })).camera, false);
+});
+
+test('a camera picture has no known age until it changes, then it carries when it changed', async () => {
+  await connect({ entities: { ...structuredClone(ENTITIES), 'cctv.cams': cctv() } });
+  const first = (await remote.entities()).entities.find((entity) => entity.id === 'cctv.cams');
+  assert.equal(first.imageAt, null);
+  const seen = [];
+  remote.on('entity', (view) => seen.push(view));
+  const before = Date.now();
+  fake.emit('entity_change', { entity_id: 'cctv.cams', entity_type: 'media_player', event_type: 'CHANGE', new_state: { attributes: { media_image_url: 'data:image/jpeg;base64,BBBB' } } });
+  const changed = await waitFor(() => seen.find((view) => view.id === 'cctv.cams' && view.imageAt !== null), { message: 'new picture' });
+  assert.ok(changed.imageAt >= before && changed.imageAt <= Date.now());
+  assert.notEqual(changed.image, first.image);
+  fake.emit('entity_change', { entity_id: 'cctv.cams', entity_type: 'media_player', event_type: 'CHANGE', new_state: { attributes: { source: 'FD' } } });
+  const sourceOnly = await waitFor(() => seen.find((view) => view.id === 'cctv.cams' && view.source === 'FD'), { message: 'source change' });
+  assert.equal(sourceOnly.imageAt, changed.imageAt);
+});
+
+test('a camera picture keeps its age when the page is opened again, and loses it only when the picture differs', async () => {
+  await connect({
+    entities: { ...structuredClone(ENTITIES), 'cctv.cams': cctv() },
+    uis: { 'act.cams': { pages: [{ page_id: 'p', grid: { width: 4, height: 4 }, items: [{ type: 'media_player', media_player_id: 'cctv.cams', location: { x: 0, y: 0 }, size: { width: 4, height: 4 } }] }] } },
+    activities: [activity('act.cams', 'Cameras', 'ON')],
+  });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  await remote.pages('act.cams');
+  const seen = [];
+  remote.on('entity', (view) => seen.push(view));
+  fake.state.entities['cctv.cams'].attributes.media_image_url = 'data:image/jpeg;base64,CCCC';
+  fake.emit('entity_change', { entity_id: 'cctv.cams', entity_type: 'media_player', event_type: 'CHANGE', new_state: { attributes: { media_image_url: 'data:image/jpeg;base64,CCCC' } } });
+  const changed = await waitFor(() => seen.find((view) => view.imageAt !== null), { message: 'new picture' });
+  const reopened = await remote.pages('act.cams');
+  assert.equal(reopened.entities['cctv.cams'].imageAt, changed.imageAt);
+  fake.state.entities['cctv.cams'].attributes.media_image_url = 'data:image/jpeg;base64,DDDD';
+  const different = await remote.pages('act.cams');
+  assert.equal(different.entities['cctv.cams'].imageAt, null);
+});

@@ -1,4 +1,5 @@
 import { ICONS, resolveIcon } from './icons.js';
+import { snapshotAge } from './camera.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const SWIPE_DISTANCE = 0.18;
@@ -240,6 +241,9 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
 
   function fillMedia(node, entity) {
     node.classList.toggle('is-openable', Boolean(entity));
+    const camera = entity?.camera === true;
+    node.classList.toggle('is-camera', camera);
+    const fallbackIcon = camera ? 'camera' : 'music';
     const art = el(entity ? 'button' : 'div', 'media-art');
     if (entity) {
       art.type = 'button';
@@ -268,7 +272,7 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
       image.addEventListener('error', () => {
         image.remove();
         backdrop.replaceChildren();
-        art.append(icon('music', 'media-art-icon'));
+        art.append(icon(fallbackIcon, 'media-art-icon'));
       }, { once: true });
       art.append(image);
       const blurred = el('img', 'media-backdrop-image');
@@ -276,7 +280,7 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
       blurred.src = src;
       backdrop.append(blurred);
     } else {
-      art.append(icon('music', 'media-art-icon'));
+      art.append(icon(fallbackIcon, 'media-art-icon'));
     }
     const playing = Boolean(entity.title);
     const meta = el('div', 'media-meta');
@@ -299,10 +303,20 @@ export function createPager(root, { onPress, onIndex, imageUrl, onOpenPlayer, on
     if (controls) body.append(controls);
     node.classList.toggle('has-controls', Boolean(controls));
     node.replaceChildren(backdrop, body);
-    if (playing) node.append(badge);
+    if (camera) {
+      if (entity.imageAt !== null && entity.imageAt !== undefined) node.append(ageBadge(entity.imageAt));
+    } else if (playing) {
+      node.append(badge);
+    }
     node.classList.toggle('has-art', Boolean(hasArt));
     node.dataset.state = stateName;
     paintProgress(node, view.media.get(entity.id));
+  }
+
+  function ageBadge(at) {
+    const age = el('span', 'media-state media-age', snapshotAge(Date.now() - at));
+    age.dataset.imageAt = String(at);
+    return age;
   }
 
   function widgetLabel(item, entity) {

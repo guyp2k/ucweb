@@ -244,6 +244,11 @@ artwork for the full player, with seek and volume. The library button browses th
 albums, radio) and plays or queues what you pick. The source button picks the player's input or output; for Spotify
 that is the list of Spotify Connect devices.
 
+**Cameras.** A player that only shows pictures (video, no play, skip or volume, like the CCTV integration's
+Security Cameras) is drawn as a camera: the whole frame at its own shape instead of square album art, no
+**Playing** badge, and how old the picture is ("Updated 12 s ago") once a new one has arrived, counting up every
+second. The camera buttons on the page switch cameras as before.
+
 <p align="center">
   <img src="docs/screenshots/phone-sources-chooser.webp" width="240" alt="Source chooser">
 </p>
