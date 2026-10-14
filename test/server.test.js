@@ -406,3 +406,17 @@ test('a signed-in browser sees the activity groups and turns one off with a same
   assert.equal(nothing.status, 409);
   assert.deepEqual(await nothing.json(), { error: 'Nothing in Den is on.' });
 });
+
+test('the service worker and app icons are served from the root with their real types and no long caching', async () => {
+  const worker = await fetch(`${base}/sw.js`);
+  assert.equal(worker.status, 200);
+  assert.equal(worker.headers.get('content-type'), 'text/javascript; charset=utf-8');
+  assert.equal(worker.headers.get('cache-control'), 'no-cache');
+  for (const icon of ['/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png']) {
+    const response = await fetch(`${base}${icon}`);
+    assert.equal(response.status, 200, icon);
+    assert.equal(response.headers.get('content-type'), 'image/png', icon);
+  }
+  const manifest = await fetch(`${base}/manifest.webmanifest`);
+  assert.equal(manifest.headers.get('content-type'), 'application/manifest+json');
+});
