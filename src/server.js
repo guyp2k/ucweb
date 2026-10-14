@@ -202,6 +202,9 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
       await remote.deviceCommand(parts[3], action, value);
       return sendJson(res, 200, { ok: true });
     }
+    if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'readiness' && method === 'GET') {
+      return sendJson(res, 200, await findRemote(parts[1]).macroReadiness(parts[3]));
+    }
     if (parts.length === 5 && parts[0] === 'remotes' && parts[2] === 'entities' && parts[4] === 'image' && method === 'GET') {
       return sendImage(res, await findRemote(parts[1]).mediaImage(parts[3]), 'private, max-age=86400');
     }

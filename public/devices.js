@@ -1,4 +1,5 @@
 import { ICONS, UC_NAMES } from './icons.js';
+import { readinessText } from './readiness.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const TARGET_DELAY_MS = 600;
@@ -102,7 +103,7 @@ function subline(entity) {
   return stateLabel(entity.state);
 }
 
-export function createDeviceTiles({ onCommand, onPlayer, onOpenPlayer, onOpenDevice, imageUrl, choose }) {
+export function createDeviceTiles({ onCommand, onPlayer, onOpenPlayer, onOpenDevice, imageUrl, choose, readiness }) {
   const pendingTargets = new Map();
 
   function slider(entity, { label, value, enabled, onCommit }) {
@@ -260,7 +261,15 @@ export function createDeviceTiles({ onCommand, onPlayer, onOpenPlayer, onOpenDev
     node.classList.toggle('is-unavailable', entity.state === 'UNAVAILABLE');
     const head = el('div', 'dev-head');
     const text = el('div', 'dev-text');
-    text.append(el('span', 'tile-name', entity.name), el('span', 'dev-sub', subline(entity)));
+    const sub = el('span', 'dev-sub', subline(entity));
+    const check = entity.type === 'macro' ? readiness(entity.id) : null;
+    if (check) {
+      const said = readinessText(check);
+      sub.textContent = said.text;
+      sub.classList.toggle('is-warn', said.warn);
+      if (said.title) sub.title = said.title;
+    }
+    text.append(el('span', 'tile-name', entity.name), sub);
     let lead = el('span', 'dev-icon');
     lead.append(icon(iconFor(entity)));
     let trailing = null;

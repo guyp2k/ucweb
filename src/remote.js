@@ -249,6 +249,49 @@ export function toProfilePages(rawPages, rawGroups = []) {
     }));
 }
 
+const READINESS_TEXT = {
+  ENTITY_NOT_FOUND: (name) => `${name} no longer exists`,
+  INTEGRATION_NOT_FOUND: (name) => `${name}'s integration is not set up`,
+  INTEGRATION_DISABLED: (name) => `${name}'s integration is disabled`,
+  INTEGRATION_NOT_CONNECTED: (name) => `${name}'s integration is not connected`,
+  IR_EMITTER_NOT_AVAILABLE: (name) => `The IR emitter for ${name} is not available`,
+  REMOTE_IR_OUTPUT_MISSING: (name) => `${name} has no IR output set`,
+  REMOTE_IR_OUTPUT_INVALID: (name) => `${name}'s IR output is not on its emitter`,
+  BT_NOT_CONNECTED: (name) => `Bluetooth is not connected, needed for ${name}`,
+  ENTITY_UNAVAILABLE: (name) => `${name} is unavailable`,
+  NESTING_LIMIT: (name) => `${name} is nested too deeply`,
+  INVALID_COMMAND: (name) => `${name} cannot run that command`,
+  SEQUENCE_ALREADY_RUNNING: (name) => `${name} is already running`,
+};
+
+export function toReadiness(report) {
+  const steps = Array.isArray(report?.steps) ? report.steps : [];
+  const total = whole(report?.total_steps, 0) ?? steps.length;
+  const skipped = whole(report?.skipped_steps, 0) ?? steps.filter((entry) => entry?.skipped === true).length;
+  const problems = [];
+  const byCause = new Map();
+  for (const entry of steps) {
+    const reason = entry?.reason;
+    if (typeof reason?.code !== 'string' || reason.code === 'ALREADY_IN_STATE') continue;
+    const cause = text(reason.group_id) ?? `${reason.code}:${entry.entity_id}`;
+    if (byCause.has(cause)) {
+      byCause.get(cause).steps += 1;
+      continue;
+    }
+    const name = text(entry.name) ?? text(entry.entity_id) ?? 'A step';
+    const problem = {
+      text: READINESS_TEXT[reason.code]?.(name) ?? text(reason.message) ?? reason.code,
+      blocking: entry.ready === false && entry.skipped !== true,
+      steps: 1,
+    };
+    byCause.set(cause, problem);
+    problems.push(problem);
+  }
+  const runs = Math.max(0, total - skipped);
+  const verdict = report?.ready !== true ? 'blocked' : runs === 0 ? 'nothing' : 'ready';
+  return { verdict, steps: total, runs, problems };
+}
+
 const DRIVER_KINDS = { LOCAL: 'Built in', CUSTOM: 'Custom', EXTERNAL: 'External' };
 const DEVICE_STATES = new Set(['UNKNOWN', 'CONNECTING', 'CONNECTED', 'DISCONNECTED', 'ERROR']);
 const DRIVER_STATES = new Set(['NOT_CONFIGURED', 'IDLE', 'CONNECTING', 'ACTIVE', 'RECONNECTING', 'ERROR']);
@@ -779,6 +822,13 @@ export class Remote extends EventEmitter {
   async integrations() {
     const [drivers, instances] = await Promise.all([this.#pagedList('/api/intg/drivers'), this.#pagedList('/api/intg/instances')]);
     return toIntegrations(drivers, instances);
+  }
+
+  async macroReadiness(entityId) {
+    await this.#loadEntities();
+    if (this.#watched.get(entityId)?.entity_type !== 'macro') throw new HttpError(404, `${this.#label} has no macro ${entityId}.`);
+    const { data } = await this.#request('GET', `/api/macros/${encodeURIComponent(entityId)}/readiness`);
+    return toReadiness(data);
   }
 
   async deviceCommand(entityId, action, value) {

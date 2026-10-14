@@ -23,7 +23,7 @@ The screenshots use made-up remotes, activities and music.
   tap again to control, one tap to turn off.
 - **Remote pages**: each page from the remote's home screen, such as Music, Lights, Thermostats or Cameras, with every
   entity on it as a live tile: switch lights and set their brightness, flip switches, set a thermostat's target and
-  mode, open, stop and position blinds, press buttons, run macros, read sensors, pick an option, play and pause
+  mode, open, stop and position blinds, press buttons, run macros (each says whether it would actually run), read sensors, pick an option, play and pause
   players (tap one for the full player), and start activities. Groups show as a titled block. Each tile offers only
   what that entity reports it supports.
 - **Devices**: a remote device with its own pages or button mapping (an AV receiver, an IR device) opens in the
@@ -204,6 +204,11 @@ temperature, steps the target with minus and plus (sent once you stop tapping) a
 supports. Blinds open, stop, close and move to a position. A player tile shows what is playing with its controls;
 tap it for the full player. A remote device with its own pages shows **Open controls**: tap it to drive that device
 in the Control panel, and the close button there hands the panel back to the running activity.
+
+A macro tile shows the remote's own pre-flight check under its name: **Ready** with its step count, **Has no steps**,
+**Runs nothing** when every step points at something deleted, or **Won't run** with the reason, such as an
+integration that is not connected. Five steps blocked by one cause show as one reason. The check reads only, so
+**Run** always stays available. It is redone a minute after it was read and whenever an integration changes.
 
 ![The Lights page on a desktop with the menu and the Control panel](docs/screenshots/desktop-lights.webp)
 
