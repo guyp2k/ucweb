@@ -361,3 +361,71 @@ test('stop closes the live connection and does not reconnect', async () => {
   await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(fake.connectionCount(), 0);
 });
+
+const ROOMS = [
+  { group_id: 'default', name: { en: 'Default' }, activity_ids: ['act.radio'] },
+  { group_id: 'g-den', name: { en_US: 'Den' }, activity_ids: ['act.tv', 'act.music', 'act.gone'] },
+  { group_id: 'g-empty', name: { en_US: 'Garage' }, activity_ids: [] },
+];
+const roomActivities = () => [activity('act.tv', 'Watch TV'), activity('act.music', 'Music'), activity('act.radio', 'Radio')];
+
+test('activity groups are listed in the remote\'s order with their activities, empty groups and unknown activities left out', async () => {
+  await connect({ activities: roomActivities(), activityGroups: ROOMS });
+  const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
+  assert.deepEqual(snapshot.groups, [
+    { id: 'default', name: 'Default', activityIds: ['act.radio'], state: 'OFF' },
+    { id: 'g-den', name: 'Den', activityIds: ['act.tv', 'act.music'], state: 'OFF' },
+  ]);
+});
+
+test('a group\'s state follows its activities live: working beats on, on beats error', async () => {
+  await connect({ activities: roomActivities(), activityGroups: ROOMS });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  const den = () => remote.snapshot().groups.find((group) => group.id === 'g-den').state;
+  const set = (id, state) => fake.emit('entity_change', { entity_type: 'activity', entity_id: id, event_type: 'CHANGE', new_state: { attributes: { state } } });
+  set('act.tv', 'ERROR');
+  await waitFor(() => den() === 'ERROR', { message: 'ERROR' });
+  set('act.music', 'ON');
+  await waitFor(() => den() === 'ACTIVE', { message: 'ACTIVE' });
+  set('act.tv', 'RUNNING');
+  await waitFor(() => den() === 'RUNNING', { message: 'RUNNING' });
+  set('act.tv', 'OFF');
+  set('act.music', 'OFF');
+  await waitFor(() => den() === 'OFF', { message: 'OFF' });
+  assert.equal(remote.snapshot().groups.find((group) => group.id === 'default').state, 'OFF');
+});
+
+test('turning a group off sends activity.off to each activity in it that is on or working, and nothing else', async () => {
+  const rooms = [ROOMS[0], { group_id: 'g-den', name: { en_US: 'Den' }, activity_ids: ['act.news', 'act.tv', 'act.music'] }];
+  await connect({ activities: [activity('act.news', 'News'), activity('act.tv', 'Watch TV', 'ON'), activity('act.music', 'Music', 'RUNNING'), activity('act.radio', 'Radio', 'ON')], activityGroups: rooms });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  assert.deepEqual(await remote.groupOff('g-den'), { stopped: ['Watch TV', 'Music'] });
+  assert.deepEqual(fake.state.commands, [
+    { entityId: 'act.tv', body: { cmd_id: 'activity.off' } },
+    { entityId: 'act.music', body: { cmd_id: 'activity.off' } },
+  ]);
+});
+
+test('a group with nothing on, or one that does not exist, is refused with a reason', async () => {
+  await connect({ activities: roomActivities(), activityGroups: ROOMS });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  await assert.rejects(remote.groupOff('g-den'), { status: 409, message: 'Nothing in Den is on.' });
+  await assert.rejects(remote.groupOff('g-nope'), { status: 404, message: 'Test Den has no activity group g-nope.' });
+  assert.deepEqual(fake.state.commands, []);
+});
+
+test('a remote that cannot list activity groups reports them as unknown, not as none, and stays online', async () => {
+  await connect({ activityGroups: null });
+  const snapshot = await waitFor(() => remote.snapshot().online && remote.snapshot(), { message: 'online' });
+  assert.equal(snapshot.groups, null);
+  await assert.rejects(remote.groupOff('default'), { status: 503 });
+});
+
+test('adding, renaming or deleting an activity reads the groups again', async () => {
+  await connect({ activities: roomActivities(), activityGroups: ROOMS });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  fake.state.activities.push(activity('act.games', 'Games'));
+  fake.state.activityGroups[1].activity_ids.push('act.games');
+  fake.emit('entity_change', { entity_type: 'activity', entity_id: 'act.games', event_type: 'NEW', new_state: activity('act.games', 'Games') });
+  await waitFor(() => remote.snapshot().groups.find((group) => group.id === 'g-den').activityIds.includes('act.games'), { message: 'regrouped' });
+});

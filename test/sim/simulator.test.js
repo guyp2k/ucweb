@@ -25,6 +25,7 @@ let cookie;
 let watch;
 let target;
 let page;
+let room;
 
 async function sim(method, pathname, body) {
   const headers = { authorization: SIM_AUTH, accept: 'application/json' };
@@ -87,6 +88,7 @@ before(async () => {
 after(async () => {
   remote?.stop();
   if (server) await new Promise((resolve) => server.close(resolve));
+  if (room) await sim('DELETE', `/api/activity_groups/${room}`).catch(() => {});
   for (const id of [watch, target]) {
     if (id) await sim('DELETE', `/api/activities/${id}`).catch(() => {});
   }
@@ -182,6 +184,20 @@ test('editing a page on the remote reaches ucweb live', async () => {
   }
   const { pages } = await (await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/pages`)).json();
   assert.equal(pages.find((candidate) => candidate.id === page).name, `${RUN} renamed page`);
+});
+
+test('an activity group made on the remote becomes a room, and turning the room off stops what runs in it', async () => {
+  room = (await sim('POST', '/api/activity_groups', { name: { en: `${RUN} room` }, activity_ids: [watch, target] })).group_id;
+  await sim('PATCH', `/api/activities/${watch}`, { description: { en: 'grouped by the ucweb simulator suite' } });
+  const listed = await waitFor(() => remote.snapshot().groups?.find((group) => group.id === room), { timeoutMs: 10000, message: `ucweb read the group: ${JSON.stringify(remote.snapshot().groups)}` });
+  assert.equal(listed.name, `${RUN} room`);
+  assert.deepEqual([...listed.activityIds].sort(), [watch, target].sort());
+  await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'ACTIVE', { timeoutMs: 10000, message: 'room ACTIVE' });
+  const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/groups/${room}/off`, { method: 'POST', body: '{}' });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).stopped, [ucwebActivity(watch).name]);
+  await waitFor(async () => (await simActivity(watch)).attributes.state === 'OFF', { timeoutMs: 10000, message: 'the room off stopped the activity' });
+  await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'OFF', { timeoutMs: 10000, message: 'room OFF live' });
 });
 
 test('an unmapped button is refused before it reaches the remote', async () => {
