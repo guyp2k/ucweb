@@ -53,6 +53,7 @@ before(async () => {
     profilePages: { p: [{ page_id: 'lights', profile_id: 'p', name: 'Lights', items: [{ entity_id: 'light.desk', pos: 1 }] }] },
     drivers: [{ driver_id: 'hass', name: { en: 'Home Assistant' }, driver_type: 'LOCAL', version: '1', driver_state: 'ACTIVE' }],
     instances: [{ integration_id: 'hass.main', driver_id: 'hass', device_state: 'CONNECTED', setup_data: { token: 'ha-secret' } }],
+    activityGroups: [{ group_id: 'g-den', name: { en_US: 'Den' }, activity_ids: ['act.tv'] }],
   });
   remote = new Remote({ address: fake.address, keysDir: dir, reconnectDelays: [20] });
   remote.start();
@@ -380,4 +381,28 @@ test('profile and integration changes reach the browser so it can reload them', 
     { type: 'integrations', remote: fake.address },
   ]);
   socket.close();
+});
+
+test('a signed-in browser sees the activity groups and turns one off with a same-site POST', async () => {
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/groups/g-den/off`;
+  const [listed] = await (await authed('/api/remotes')).json();
+  assert.deepEqual(listed.groups.map((group) => group.id), ['g-den']);
+  fake.emit('entity_change', { entity_type: 'activity', entity_id: 'act.tv', event_type: 'CHANGE', new_state: { attributes: { state: 'ON' } } });
+  await waitFor(() => remote.snapshot().groups[0].state === 'ACTIVE', { message: 'den on' });
+  fake.state.commands.length = 0;
+  const anonymous = await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  assert.equal(anonymous.status, 401);
+  assert.equal((await authed(route, { method: 'POST', body: '{}', headers: { origin: 'http://evil.example' } })).status, 403);
+  assert.equal((await authed(route, { method: 'GET' })).status, 405);
+  assert.equal((await authed(route, { method: 'POST', body: 'off', headers: { 'content-type': 'text/plain' } })).status, 415);
+  assert.deepEqual(fake.state.commands, []);
+  const response = await authed(route, { method: 'POST', body: '{}' });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { stopped: ['Watch TV'] });
+  assert.deepEqual(fake.state.commands, [{ entityId: 'act.tv', body: { cmd_id: 'activity.off' } }]);
+  fake.emit('entity_change', { entity_type: 'activity', entity_id: 'act.tv', event_type: 'CHANGE', new_state: { attributes: { state: 'OFF' } } });
+  await waitFor(() => remote.snapshot().groups[0].state === 'OFF', { message: 'den off' });
+  const nothing = await authed(route, { method: 'POST', body: '{}' });
+  assert.equal(nothing.status, 409);
+  assert.deepEqual(await nothing.json(), { error: 'Nothing in Den is on.' });
 });

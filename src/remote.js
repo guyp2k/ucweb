@@ -25,6 +25,7 @@ const TEMPERATURE_UNITS = { CELSIUS: '°C', FAHRENHEIT: '°F' };
 const REMOTE_TEMPERATURE_UNITS = { METRIC: '°C', UK: '°C', US: '°F' };
 const TARGET_COMMANDS = { '°C': 'climate.target_temperature_c', '°F': 'climate.target_temperature_f' };
 const SYSTEM_COMMANDS = new Set(['REBOOT', 'POWER_OFF']);
+const ACTIVITY_ON = new Set(['ON', 'RUNNING']);
 const ITEM_TYPES = new Set(['text', 'icon', 'media_player', 'sensor', 'select']);
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -82,6 +83,13 @@ export function toActivity(entity) {
     description: localizedText(entity.description),
     state: entity.attributes?.state ?? null,
   };
+}
+
+export function groupState(states) {
+  if (states.includes('RUNNING')) return 'RUNNING';
+  if (states.includes('ON')) return 'ACTIVE';
+  if (states.includes('ERROR')) return 'ERROR';
+  return 'OFF';
 }
 
 export function toBattery(data) {
@@ -495,6 +503,7 @@ export class Remote extends EventEmitter {
       powerSupply: null,
       powerMode: null,
       activities: new Map(),
+      groups: null,
     };
   }
 
@@ -503,10 +512,15 @@ export class Remote extends EventEmitter {
   }
 
   snapshot() {
-    const { activities, ...rest } = this.#state;
+    const { activities, groups, ...rest } = this.#state;
     return {
       ...rest,
       activities: [...activities.values()].sort((a, b) => a.name.localeCompare(b.name)),
+      groups: groups === null ? null : groups.flatMap((group) => {
+        const activityIds = group.activityIds.filter((id) => activities.has(id));
+        if (activityIds.length === 0) return [];
+        return [{ id: group.id, name: group.name, activityIds, state: groupState(activityIds.map((id) => activities.get(id).state)) }];
+      }),
     };
   }
 
@@ -528,6 +542,17 @@ export class Remote extends EventEmitter {
     await this.#request('PUT', `/api/entities/${encodeURIComponent(activityId)}/command`, {
       cmd_id: on ? 'activity.on' : 'activity.off',
     });
+  }
+
+  async groupOff(groupId) {
+    const groups = this.#state.groups;
+    if (groups === null) throw new HttpError(503, `${this.#label} did not list its activity groups.`);
+    const group = groups.find((candidate) => candidate.id === groupId);
+    if (!group) throw new HttpError(404, `${this.#label} has no activity group ${groupId}.`);
+    const on = group.activityIds.map((id) => this.#state.activities.get(id)).filter((activity) => activity && ACTIVITY_ON.has(activity.state));
+    if (on.length === 0) throw new HttpError(409, `Nothing in ${group.name} is on.`);
+    for (const activity of on) await this.setActivityPower(activity.id, false);
+    return { stopped: on.map((activity) => activity.name) };
   }
 
   async systemCommand(cmd) {
@@ -1014,14 +1039,16 @@ export class Remote extends EventEmitter {
       const seen = (page - 1) * PAGE_SIZE + batch.length;
       if (batch.length < PAGE_SIZE || (Number.isFinite(total) && total > 0 && seen >= total)) break;
     }
-    const [battery, power, localization] = await Promise.all([
+    const [battery, power, localization, groups] = await Promise.all([
       this.#optional('/api/system/power/battery'),
       this.#optional('/api/system/power'),
       this.#optional('/api/cfg/localization'),
+      this.#loadGroups(),
     ]);
     const unit = localization.data?.measurement_unit;
     this.#measurementUnit = Object.hasOwn(REMOTE_TEMPERATURE_UNITS, unit ?? '') ? unit : null;
     this.#state.activities = activities;
+    this.#state.groups = groups;
     this.#mappings.clear();
     this.#uis.clear();
     this.#entityLoad = null;
@@ -1039,6 +1066,34 @@ export class Remote extends EventEmitter {
       if (error.status !== 502) throw error;
       this.emit('warning', error.message);
       return { data: null, problem: error.message };
+    }
+  }
+
+  async #loadGroups() {
+    try {
+      const list = (await this.#pagedList('/api/activity_groups')).filter((group) => typeof group?.group_id === 'string' && group.group_id && group.activity_count !== 0);
+      return await Promise.all(list.map(async (overview) => {
+        const { data } = await this.#request('GET', `/api/activity_groups/${encodeURIComponent(overview.group_id)}`);
+        const members = Array.isArray(data?.activities) ? data.activities : [];
+        return {
+          id: overview.group_id,
+          name: localizedText(overview.name) ?? overview.group_id,
+          activityIds: members.map((member) => member?.entity_id).filter((id) => typeof id === 'string' && id),
+        };
+      }));
+    } catch (error) {
+      if (error.status !== 502) throw error;
+      this.emit('warning', error.message);
+      return null;
+    }
+  }
+
+  async #refreshGroups() {
+    try {
+      this.#state.groups = await this.#loadGroups();
+      this.#emitChange();
+    } catch (error) {
+      this.emit('warning', `Reading the activity groups of ${this.#label} failed: ${error.message}`);
     }
   }
 
@@ -1165,10 +1220,12 @@ export class Remote extends EventEmitter {
     if (eventType === 'DELETE') {
       activities.delete(entityId);
       this.#forgetActivity(entityId);
+      this.#refreshGroups();
     } else if (newState?.name !== undefined) {
       if (newState.enabled === false) activities.delete(entityId);
       else activities.set(entityId, toActivity({ entity_id: entityId, ...newState }));
       this.#forgetActivity(entityId);
+      this.#refreshGroups();
     } else if (activities.has(entityId) && newState?.attributes?.state !== undefined) {
       activities.get(entityId).state = newState.attributes.state;
     } else {
