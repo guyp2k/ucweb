@@ -1,41 +1,9 @@
 import { chown, mkdir, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { hashPin, PIN_PATTERN } from './auth.js';
+import { ask as prompt } from './prompt.js';
 
-function ask(question) {
-  return new Promise((resolve, reject) => {
-    const { stdin, stdout } = process;
-    if (!stdin.isTTY) {
-      reject(new Error('Run this in an interactive terminal: docker exec -it ucweb npm run set-pin'));
-      return;
-    }
-    stdout.write(question);
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.setEncoding('utf8');
-    let answer = '';
-    const onData = (text) => {
-      for (const char of text) {
-        if (char === '\r' || char === '\n') {
-          stdin.setRawMode(false);
-          stdin.pause();
-          stdin.off('data', onData);
-          stdout.write('\n');
-          resolve(answer);
-          return;
-        }
-        if (char === '\u0003') {
-          stdin.setRawMode(false);
-          stdout.write('\n');
-          process.exit(130);
-        }
-        if (char === '\u007f' || char === '\b') answer = answer.slice(0, -1);
-        else answer += char;
-      }
-    };
-    stdin.on('data', onData);
-  });
-}
+const ask = (question) => prompt(question, { command: 'set-pin' });
 
 const configDir = process.env.UCWEB_CONFIG_DIR || '/config';
 const file = path.join(configDir, 'pin.hash');

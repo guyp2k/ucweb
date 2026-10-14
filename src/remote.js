@@ -1035,7 +1035,7 @@ export class Remote extends EventEmitter {
       key = (await readFile(file, 'utf8')).trim();
     } catch (error) {
       if (error.code === 'ENOENT') {
-        throw new HttpError(503, `No API key for ${this.#label}: expected ${file}. Create one with scripts/create-api-key.sh.`);
+        throw new HttpError(503, `No API key for ${this.#label}: expected ${file}. Create one with: docker exec -it ucweb npm run create-key`);
       }
       throw new HttpError(503, `Cannot read the API key ${file}: ${error.code ?? error.message}.`);
     }
@@ -1144,7 +1144,7 @@ export class Remote extends EventEmitter {
       };
 
       socket.on('unexpected-response', (_request, response) => {
-        const hint = response.statusCode === 401 ? ' The API key was rejected; create a new one with scripts/create-api-key.sh --replace.' : '';
+        const hint = response.statusCode === 401 ? ' The API key was rejected; create a new one with: docker exec -it ucweb npm run create-key -- --replace' : '';
         fail(`${this.#label} refused the live connection: HTTP ${response.statusCode}.${hint}`);
         socket.terminate();
       });
@@ -1171,7 +1171,7 @@ export class Remote extends EventEmitter {
         }
         if (!authenticated && message.kind === 'resp' && message.msg === 'authentication') {
           if (message.code !== 200) {
-            fail(`${this.#label} rejected the API key (code ${message.code}). Create a new one with scripts/create-api-key.sh --replace.`);
+            fail(`${this.#label} rejected the API key (code ${message.code}). Create a new one with: docker exec -it ucweb npm run create-key -- --replace`);
             socket.terminate();
             return;
           }

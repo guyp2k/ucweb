@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +7,7 @@ import { after, before, test } from 'node:test';
 import { Auth, hashPin } from '../../src/auth.js';
 import { Remote } from '../../src/remote.js';
 import { assetVersion, createServer, discoverThemes } from '../../src/server.js';
+import { run as createKeys } from '../../src/create-key.js';
 import { waitFor } from '../helpers/fake-remote.js';
 
 const SIM = process.env.UC_SIM ?? '127.0.0.1:8080';
@@ -90,6 +91,9 @@ after(async () => {
   remote?.stop();
   if (server) await new Promise((resolve) => server.close(resolve));
   if (room) await sim('DELETE', `/api/activity_groups/${room}`).catch(() => {});
+  for (const made of await sim('GET', '/api/auth/api_keys').catch(() => [])) {
+    if (made.name === 'ucweb') await sim('DELETE', `/api/auth/api_keys/${made.key_id}`).catch(() => {});
+  }
   for (const id of [watch, target]) {
     if (id) await sim('DELETE', `/api/activities/${id}`).catch(() => {});
   }
@@ -108,6 +112,44 @@ test('the device, firmware, battery and power mode come from the simulator', asy
   assert.equal(snapshot.batteryProblem, null);
   assert.equal(snapshot.powerSupply, power.power_supply);
   assert.equal(snapshot.powerMode, power.mode);
+});
+
+test('create-key makes a working ucweb key with the configurator PIN, skips it once it works, and --replace swaps it', async () => {
+  const keysDir = path.join(dir, 'made-keys');
+  const pin = process.env.UC_SIM_PASSWORD ?? '1234';
+  const runKeys = async (argv) => {
+    const out = [];
+    const code = await createKeys({ argv: [SIM, ...argv], env: { UC_KEYS_DIR: keysDir }, askPin: async () => pin, log: (line) => out.push(line), warn: (line) => out.push(`! ${line}`) });
+    return { code, out };
+  };
+  for (const made of await sim('GET', '/api/auth/api_keys')) {
+    if (made.name === 'ucweb') await sim('DELETE', `/api/auth/api_keys/${made.key_id}`);
+  }
+  const first = await runKeys([]);
+  assert.equal(first.code, 0, first.out.join('\n'));
+  const file = path.join(keysDir, `${String((await simReady()).hostname).replace(/\.local$/, '')}.key`);
+  const key = (await readFile(file, 'utf8')).trim();
+  assert.equal((await fetch(`http://${SIM}/api/system`, { headers: { authorization: `Bearer ${key}` } })).status, 200);
+  const ours = (await sim('GET', '/api/auth/api_keys')).filter((made) => made.name === 'ucweb');
+  assert.equal(ours.length, 1);
+  assert.deepEqual(ours[0].scopes, ['admin']);
+  const again = await runKeys([]);
+  assert.equal(again.code, 0);
+  assert.match(again.out.join('\n'), /Nothing to do/);
+  await rm(file);
+  const duplicate = await runKeys([]);
+  assert.equal(duplicate.code, 1);
+  assert.match(duplicate.out.join('\n'), /already has a key named "ucweb"\. Run again with --replace/);
+  const replaced = await runKeys(['--replace']);
+  assert.equal(replaced.code, 0, replaced.out.join('\n'));
+  assert.ok(replaced.out.includes(`Revoked the old ucweb key ${ours[0].key_id} on ${remote.snapshot().name}.`), replaced.out.join('\n'));
+  const newKey = (await readFile(file, 'utf8')).trim();
+  assert.notEqual(newKey, key);
+  assert.equal((await fetch(`http://${SIM}/api/system`, { headers: { authorization: `Bearer ${key}` } })).status, 401);
+  assert.equal((await fetch(`http://${SIM}/api/system`, { headers: { authorization: `Bearer ${newKey}` } })).status, 200);
+  const wrong = await createKeys({ argv: [SIM, '--replace'], env: { UC_KEYS_DIR: keysDir }, askPin: async () => '0000', log: () => {}, warn: () => {} });
+  assert.equal(wrong, 1);
+  assert.equal((await readFile(file, 'utf8')).trim(), newKey);
 });
 
 test('the web configurator link opens the remote\'s configurator page', async () => {

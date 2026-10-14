@@ -90,41 +90,12 @@ You need:
 - One or more Unfolded Circle remotes on your network, and each one's **web-configurator PIN**: the PIN you use to
   sign in to the remote's web configurator.
 - A machine that runs Docker on the same network as the remotes: Unraid, a NAS, a Raspberry Pi, any Linux box.
-- For step 1, a computer with `bash`, `curl` and `python3`: macOS and most Linux machines have them. Unraid does not
-  ship `python3`, so run step 1 from a laptop and copy the key files over.
 
-### 1. Create an API key on each remote
+Give each remote a fixed IP address in your router first, so ucweb can always find it.
 
-Give each remote a fixed IP address in your router first, so ucweb can always find it. Then, from a clone of this
-repository (or just a download of `scripts/create-api-key.sh`):
+### 1. Run the container
 
-```sh
-UC_KEYS_DIR=./keys scripts/create-api-key.sh 192.168.1.20
-```
-
-```text
-Web-configurator PIN for Living Room (192.168.1.20):
-Created the ucweb key for Living Room and stored it in ./keys/Remote3-a1b2c3.key.
-The key in ./keys/Remote3-a1b2c3.key works on Living Room (192.168.1.20).
-```
-
-It asks for that remote's web-configurator PIN once (it is not saved), creates an API key named `ucweb`, and saves
-it as `keys/<remote hostname>.key`. ucweb finds each key by that file name, so leave the names as they are. Run it
-once per remote. `--check` tests a stored key and `--replace` revokes the old `ucweb` key and issues a new one.
-
-The key has admin scope on that remote: treat the files like passwords.
-
-### 2. Run the container
-
-Put the key files in a `keys` folder inside the folder you give ucweb as `/config`, then start it with your
-remotes' addresses:
-
-```text
-/path/to/ucweb/
-└── keys/
-    ├── Remote3-a1b2c3.key
-    └── Remote3-d4e5f6.key
-```
+Start ucweb with your remotes' addresses and a folder for its settings and keys as `/config`:
 
 ```sh
 docker run -d --name ucweb --init --restart unless-stopped \
@@ -150,6 +121,8 @@ services:
       UC_REMOTES: 192.168.1.20,192.168.1.21
 ```
 
+Until step 2 is done, the log says `No API key for ...` for each remote. That is expected.
+
 #### On Unraid, step by step
 
 1. Install the template. In a terminal on the server (the `>_` button at the top of the web UI):
@@ -159,16 +132,43 @@ services:
      https://raw.githubusercontent.com/guyp2k/ucweb/main/unraid/ucweb.xml
    ```
 
-2. Copy the key files from step 1 to `/mnt/user/appdata/ucweb/keys/` (over the network share, or with `scp`).
-3. Open **Docker**, then **Add Container**, and pick **ucweb** under *User templates*.
-4. Fill in **Remotes** with your remotes' IP addresses, comma separated. Leave **Config** at
+2. Open **Docker**, then **Add Container**, and pick **ucweb** under *User templates*.
+3. Fill in **Remotes** with your remotes' IP addresses, comma separated. Leave **Config** at
    `/mnt/user/appdata/ucweb`.
-5. Choose the network. **Bridge** serves ucweb on the server's IP at the **Web UI port** (8080). A custom network
+4. Choose the network. **Bridge** serves ucweb on the server's IP at the **Web UI port** (8080). A custom network
    such as `br0` gives ucweb its own IP address, served on port 8080. Either works; the custom network keeps port
    8080 free on the server.
-6. Optional, under *Show more settings*: the **Default theme** for browsers that have not picked one. PUID 99 and
+5. Optional, under *Show more settings*: the **Default theme** for browsers that have not picked one. PUID 99 and
    PGID 100 are Unraid's defaults; keep them.
-7. **Apply**. The container log should show `connected to <remote name>` once for each remote.
+6. **Apply**.
+
+### 2. Create an API key on each remote
+
+```sh
+docker exec -it ucweb npm run create-key
+```
+
+```text
+Web-configurator PIN for Living Room (192.168.1.20):
+Created the ucweb key for Living Room and stored it in /config/keys/Remote3-a1b2c3.key.
+The key in /config/keys/Remote3-a1b2c3.key works on Living Room (192.168.1.20).
+Web-configurator PIN for Bedroom (192.168.1.21):
+...
+ucweb picks the keys up on its own within 30 seconds; no restart needed.
+```
+
+It goes through every remote in `UC_REMOTES`, asks for that remote's web-configurator PIN (it is not saved),
+creates an API key named `ucweb` and saves it as `/config/keys/<remote hostname>.key`. Remotes whose key already
+works are skipped. ucweb connects to each remote on its own as soon as its key is there: the log shows
+`connected to <remote name>`. On Unraid you can also click the ucweb icon on the Docker page, choose **Console**,
+and run `npm run create-key`.
+
+- `npm run create-key -- 192.168.1.20` does one remote.
+- `npm run create-key -- --check` tests the stored keys without changing anything.
+- `npm run create-key -- --replace` revokes the old `ucweb` key and issues a new one, for example after a remote
+  was reset.
+
+The key has admin scope on that remote: treat the files like passwords.
 
 ### 3. Set the PIN
 
@@ -301,8 +301,8 @@ keys, PIN and sign-ins are kept in `/config`.
 
 | What you see | What to do |
 |---|---|
-| A remote shows **Offline** with "No API key for ... expected /config/keys/....key" | The key file is missing or misnamed. Its name must be the remote's hostname, exactly as `create-api-key.sh` saved it. |
-| "The API key was rejected" | The key was deleted on the remote or the remote was reset. Run `create-api-key.sh <ip> --replace` and copy the new file over. |
+| A remote shows **Offline** with "No API key for ... expected /config/keys/....key" | Run `docker exec -it ucweb npm run create-key`. A key copied in by hand must be named after the remote's hostname, exactly as the message shows. |
+| "The API key was rejected" | The key was deleted on the remote or the remote was reset. Run `docker exec -it ucweb npm run create-key -- --replace`. |
 | "... did not answer" | Check the IP in `UC_REMOTES` and that the server can reach the remote (same network or a firewall rule between VLANs). A remote that is asleep off its dock drops off Wi-Fi; ucweb reconnects on its own when it wakes. |
 | The status bar says **Low power** | Normal. A docked remote dozes with its screen off but stays connected and controllable. |
 | Battery says **Not readable**, or shows a dimmed level with **Last read ... ago** | Some firmware answers battery requests with an error while docked in low power. ucweb shows the last level it read (until the container restarts), asks again every minute and goes back to the live level as soon as an answer comes. In testing, shortening the remote's sleep timeout from 10 to 5 minutes made it go away. |
