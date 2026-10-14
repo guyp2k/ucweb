@@ -35,7 +35,11 @@ const ENTITIES = {
         { type: 'text', text: 'Power', command: { cmd_id: 'remote.toggle' }, location: { x: 2, y: 0 }, size: { width: 2, height: 1 } },
         { type: 'text', text: 'Label', location: { x: 0, y: 1 }, size: { width: 4, height: 1 } },
       ] }] },
-      button_mapping: [{ button: 'VOLUME_UP', short_press: { cmd_id: 'volume_up' } }, { button: 'BACK' }],
+      button_mapping: [
+        { button: 'VOLUME_UP', short_press: { cmd_id: 'volume_up' } },
+        { button: 'BACK' },
+        { button: 'PLAY', short_press: { cmd_id: 'CONSUMER_PLAY_PAUSE' }, long_press: { cmd_id: 'CONSUMER_STOP' } },
+      ],
     },
   }),
   'remote.ir': entity('remote.ir', 'remote', {
@@ -253,12 +257,23 @@ test('a remote device\'s own pages send simple commands through the command its 
 test('a remote device\'s buttons follow its own button mapping', async () => {
   await connect();
   assert.deepEqual(await remote.buttons('remote.avr', 'device'), [
-    { button: 'VOLUME_UP', mapped: true, fallback: false },
-    { button: 'BACK', mapped: false, fallback: false },
+    { button: 'VOLUME_UP', mapped: true, fallback: false, long: false },
+    { button: 'BACK', mapped: false, fallback: false, long: false },
+    { button: 'PLAY', mapped: true, fallback: false, long: true },
   ]);
   await remote.press('remote.avr', 'VOLUME_UP', 'device');
   await assert.rejects(remote.press('remote.avr', 'BACK', 'device'), { status: 409 });
   assert.deepEqual(fake.state.commands, [{ entityId: 'remote.avr', body: { cmd_id: 'remote.send_cmd', params: { command: 'volume_up' } } }]);
+});
+
+test('a remote device\'s long press sends its own command the same way as its short press', async () => {
+  await connect();
+  await remote.press('remote.avr', 'PLAY', 'device');
+  await remote.press('remote.avr', 'PLAY', 'device', { long: true });
+  assert.deepEqual(fake.state.commands, [
+    { entityId: 'remote.avr', body: { cmd_id: 'remote.send_cmd', params: { command: 'CONSUMER_PLAY_PAUSE' } } },
+    { entityId: 'remote.avr', body: { cmd_id: 'remote.send_cmd', params: { command: 'CONSUMER_STOP' } } },
+  ]);
 });
 
 test('only a remote device with pages or buttons can be opened as a device, and an activity id is not one', async () => {

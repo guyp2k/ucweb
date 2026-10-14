@@ -70,6 +70,7 @@ before(async () => {
   watch = (await sim('POST', '/api/activities', { name: { en: `${RUN} watch` }, description: { en: 'made by the ucweb simulator suite' } })).entity_id;
   await sim('PATCH', `/api/activities/${watch}`, { options: { entity_ids: [target] } });
   await sim('PATCH', `/api/activities/${watch}/buttons/VOLUME_UP`, { short_press: { entity_id: target, cmd_id: 'activity.start' } });
+  await sim('PATCH', `/api/activities/${watch}/buttons/VOLUME_DOWN`, { long_press: { entity_id: target, cmd_id: 'activity.start' } });
 
   remote = new Remote({ address: SIM, keysDir: dir, reconnectDelays: [500, 1000, 2000] });
   remote.start();
@@ -126,8 +127,8 @@ test('activities made on the remote are listed with their names and states', asy
 
 test('the button list matches the mapping the remote stores', async () => {
   const buttons = new Map((await (await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/buttons`)).json()).map((button) => [button.button, button]));
-  assert.deepEqual(buttons.get('VOLUME_UP'), { button: 'VOLUME_UP', mapped: true, fallback: false });
-  assert.deepEqual(buttons.get('DPAD_UP'), { button: 'DPAD_UP', mapped: false, fallback: false });
+  assert.deepEqual(buttons.get('VOLUME_UP'), { button: 'VOLUME_UP', mapped: true, fallback: false, long: false });
+  assert.deepEqual(buttons.get('DPAD_UP'), { button: 'DPAD_UP', mapped: false, fallback: false, long: false });
 });
 
 test('starting an activity turns it on at the remote and the live event reaches ucweb', async () => {
@@ -223,6 +224,17 @@ test('turning activities off turns them off at the remote', async () => {
     await waitFor(async () => (await simActivity(id)).attributes.state === 'OFF', { timeoutMs: 10000, message: `${id} OFF at the simulator` });
     await waitFor(() => ucwebActivity(id)?.state === 'OFF', { timeoutMs: 10000, message: `ucweb saw ${id} OFF` });
   }
+});
+
+test('a button with only a long press is listed as such, and holding it runs the long press on the remote', async () => {
+  const buttons = new Map((await (await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/buttons`)).json()).map((button) => [button.button, button]));
+  assert.deepEqual(buttons.get('VOLUME_DOWN'), { button: 'VOLUME_DOWN', mapped: false, fallback: false, long: true });
+  assert.equal(buttons.get('VOLUME_UP').long, false);
+  const route = `/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/buttons/VOLUME_DOWN`;
+  assert.equal((await ucweb(route, { method: 'POST', body: '{}' })).status, 409);
+  assert.equal((await simActivity(target)).attributes.state, 'OFF');
+  assert.equal((await ucweb(route, { method: 'POST', body: '{"long":true}' })).status, 200);
+  await waitFor(async () => (await simActivity(target)).attributes.state === 'ON', { timeoutMs: 10000, message: 'the long press started the target' });
 });
 
 test('renaming an activity on the remote shows up in ucweb live', async () => {

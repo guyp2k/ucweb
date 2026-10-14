@@ -244,7 +244,8 @@ export function createServer({ remotes, publicDir, themes, defaultTheme, auth, v
         return sendJson(res, 200, { ok: true });
       }
       if (parts.length === 6 && parts[4] === 'buttons') {
-        await remote.press(activityId, parts[5], kind);
+        if (body.long !== undefined && typeof body.long !== 'boolean') throw new HttpError(400, 'Send {"long": true} for a long press, or nothing for a short one.');
+        await remote.press(activityId, parts[5], kind, { long: body.long === true });
         return sendJson(res, 200, { ok: true });
       }
       if (parts.length === 8 && parts[4] === 'pages' && parts[6] === 'items') {

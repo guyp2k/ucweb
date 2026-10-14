@@ -253,10 +253,42 @@ test('the button list reports which buttons are mapped', async () => {
   await connect({ buttonMappings: { 'act.tv': mapping('media.tv') } });
   await waitFor(() => remote.snapshot().online, { message: 'online' });
   assert.deepEqual(await remote.buttons('act.tv'), [
-    { button: 'DPAD_UP', mapped: true, fallback: false },
-    { button: 'VOLUME_UP', mapped: true, fallback: false },
-    { button: 'BACK', mapped: false, fallback: false },
+    { button: 'DPAD_UP', mapped: true, fallback: false, long: false },
+    { button: 'VOLUME_UP', mapped: true, fallback: false, long: false },
+    { button: 'BACK', mapped: false, fallback: false, long: false },
   ]);
+});
+
+const withLong = [
+  { button: 'PLAY', short_press: { entity_id: 'media.tv', cmd_id: 'media_player.play_pause' }, long_press: { entity_id: 'media.tv', cmd_id: 'media_player.stop' } },
+  { button: 'NEXT', short_press: { entity_id: 'media.tv', cmd_id: 'media_player.next' } },
+  { button: 'MENU', long_press: { entity_id: 'media.tv', cmd_id: 'media_player.menu' } },
+];
+
+test('a button with a long press says so, and the long press sends its own command while the short press is unchanged', async () => {
+  await connect({ buttonMappings: { 'act.tv': withLong } });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  assert.deepEqual(await remote.buttons('act.tv'), [
+    { button: 'PLAY', mapped: true, fallback: false, long: true },
+    { button: 'NEXT', mapped: true, fallback: false, long: false },
+    { button: 'MENU', mapped: false, fallback: false, long: true },
+  ]);
+  await remote.press('act.tv', 'PLAY');
+  await remote.press('act.tv', 'PLAY', 'activity', { long: true });
+  await remote.press('act.tv', 'MENU', 'activity', { long: true });
+  assert.deepEqual(fake.state.commands, [
+    { entityId: 'media.tv', body: { cmd_id: 'media_player.play_pause' } },
+    { entityId: 'media.tv', body: { cmd_id: 'media_player.stop' } },
+    { entityId: 'media.tv', body: { cmd_id: 'media_player.menu' } },
+  ]);
+});
+
+test('a long press on a button that has none is refused and sends nothing', async () => {
+  await connect({ buttonMappings: { 'act.tv': withLong } });
+  await waitFor(() => remote.snapshot().online, { message: 'online' });
+  await assert.rejects(remote.press('act.tv', 'NEXT', 'activity', { long: true }), { status: 409, message: 'NEXT has no long press in Watch TV.' });
+  await assert.rejects(remote.press('act.tv', 'MENU'), { status: 409 });
+  assert.deepEqual(fake.state.commands, []);
 });
 
 const player = (features) => ({ entity_id: 'media.tv', entity_type: 'media_player', features });
@@ -273,12 +305,12 @@ test('unmapped buttons go to the device the D-pad drives when it reports the fea
   await connect({ buttonMappings: { 'act.tv': dpadOnly }, entities: { 'media.tv': player(['dpad', 'home', 'menu', 'stop', 'record']) } });
   await waitFor(() => remote.snapshot().online, { message: 'online' });
   assert.deepEqual(await remote.buttons('act.tv'), [
-    { button: 'DPAD_UP', mapped: true, fallback: false },
-    { button: 'BACK', mapped: true, fallback: true },
-    { button: 'HOME', mapped: true, fallback: true },
-    { button: 'MENU', mapped: true, fallback: true },
-    { button: 'STOP', mapped: true, fallback: true },
-    { button: 'RECORD', mapped: true, fallback: true },
+    { button: 'DPAD_UP', mapped: true, fallback: false, long: false },
+    { button: 'BACK', mapped: true, fallback: true, long: false },
+    { button: 'HOME', mapped: true, fallback: true, long: false },
+    { button: 'MENU', mapped: true, fallback: true, long: false },
+    { button: 'STOP', mapped: true, fallback: true, long: false },
+    { button: 'RECORD', mapped: true, fallback: true, long: false },
   ]);
   for (const button of ['BACK', 'HOME', 'MENU', 'STOP', 'RECORD']) await remote.press('act.tv', button);
   assert.deepEqual(fake.state.commands.map((command) => [command.entityId, command.body.cmd_id]), [

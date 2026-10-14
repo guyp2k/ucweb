@@ -363,7 +363,7 @@ test('device controls need a session and a same-site POST, and send only what th
 test('a remote device opens like an activity: its buttons press through the device route, and it has no power route', async () => {
   const at = `/api/remotes/${encodeURIComponent(fake.address)}/devices/remote.amp`;
   fake.state.commands.length = 0;
-  assert.deepEqual(await (await authed(`${at}/buttons`)).json(), [{ button: 'MUTE', mapped: true, fallback: false }]);
+  assert.deepEqual(await (await authed(`${at}/buttons`)).json(), [{ button: 'MUTE', mapped: true, fallback: false, long: false }]);
   assert.equal((await authed(`${at}/buttons/MUTE`, { method: 'POST', body: '{}' })).status, 200);
   assert.deepEqual(fake.state.commands, [{ entityId: 'remote.amp', body: { cmd_id: 'remote.send_cmd', params: { command: 'mute' } } }]);
   assert.equal((await authed(`${at}/power`, { method: 'POST', body: '{"on":true}' })).status, 404);
@@ -419,4 +419,15 @@ test('the service worker and app icons are served from the root with their real 
   }
   const manifest = await fetch(`${base}/manifest.webmanifest`);
   assert.equal(manifest.headers.get('content-type'), 'application/manifest+json');
+});
+
+test('a long press goes through the button route with long true, and anything but a boolean is refused', async () => {
+  const route = `/api/remotes/${encodeURIComponent(fake.address)}/activities/act.tv/buttons/VOLUME_UP`;
+  fake.state.commands.length = 0;
+  assert.equal((await authed(route, { method: 'POST', body: '{"long":"yes"}' })).status, 400);
+  const refused = await authed(route, { method: 'POST', body: '{"long":true}' });
+  assert.equal(refused.status, 409);
+  assert.deepEqual(await refused.json(), { error: 'VOLUME_UP has no long press in Watch TV.' });
+  assert.equal((await authed(route, { method: 'POST', body: '{"long":false}' })).status, 200);
+  assert.deepEqual(fake.state.commands, [{ entityId: 'media.tv', body: { cmd_id: 'media_player.volume_up' } }]);
 });
