@@ -187,6 +187,8 @@ test('editing a page on the remote reaches ucweb live', async () => {
 });
 
 test('an activity group made on the remote becomes a room, and turning the room off stops what runs in it', async () => {
+  assert.equal((await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/power`, { method: 'POST', body: '{"on":true}' })).status, 200);
+  await waitFor(async () => (await simActivity(watch)).attributes.state === 'ON', { timeoutMs: 10000, message: 'watch ON at the simulator' });
   room = (await sim('POST', '/api/activity_groups', { name: { en: `${RUN} room` }, activity_ids: [watch, target] })).group_id;
   await sim('PATCH', `/api/activities/${watch}`, { description: { en: 'grouped by the ucweb simulator suite' } });
   const listed = await waitFor(() => remote.snapshot().groups?.find((group) => group.id === room), { timeoutMs: 10000, message: `ucweb read the group: ${JSON.stringify(remote.snapshot().groups)}` });
@@ -195,7 +197,9 @@ test('an activity group made on the remote becomes a room, and turning the room 
   await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'ACTIVE', { timeoutMs: 10000, message: 'room ACTIVE' });
   const running = [];
   for (const id of listed.activityIds) {
-    if (['ON', 'RUNNING'].includes((await simActivity(id)).attributes.state)) running.push(id);
+    const state = (await simActivity(id)).attributes.state;
+    await waitFor(() => ucwebActivity(id)?.state === state, { timeoutMs: 10000, message: `ucweb agrees ${id} is ${state}` });
+    if (['ON', 'RUNNING'].includes(state)) running.push(id);
   }
   assert.ok(running.length > 0, 'something in the room is on at the simulator');
   const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/groups/${room}/off`, { method: 'POST', body: '{}' });
