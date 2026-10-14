@@ -611,29 +611,29 @@ svg {
   background: var(--accent-fill);
 }
 
-:is(.tile, .control-title, .room)[data-state="ON"] .badge {
+:is(.tile, .control-title)[data-state="ON"] .badge {
   color: var(--accent);
 }
 
-:is(.tile, .control-title, .room)[data-state="ON"] .badge::before {
+:is(.tile, .control-title)[data-state="ON"] .badge::before {
   background: var(--on);
   box-shadow: 0 0 8px color-mix(in srgb, var(--on) 55%, transparent);
 }
 
-:is(.tile, .control-title, .room)[data-state="RUNNING"] .badge {
+:is(.tile, .control-title)[data-state="RUNNING"] .badge {
   color: var(--accent);
 }
 
-:is(.tile, .control-title, .room)[data-state="RUNNING"] .badge::before {
+:is(.tile, .control-title)[data-state="RUNNING"] .badge::before {
   background: var(--accent);
   animation: state-pulse 1s ease-in-out infinite;
 }
 
-:is(.tile, .control-title, .room)[data-state="ERROR"] .badge {
+:is(.tile, .control-title)[data-state="ERROR"] .badge {
   color: var(--warn);
 }
 
-:is(.tile, .control-title, .room)[data-state="ERROR"] .badge::before {
+:is(.tile, .control-title)[data-state="ERROR"] .badge::before {
   background: var(--warn);
 }
 
@@ -668,73 +668,9 @@ svg {
   color: var(--muted);
 }
 
-.tile-off:hover:not(:disabled),
-.room-off:hover:not(:disabled) {
+.tile-off:hover:not(:disabled) {
   color: var(--text);
   border-color: var(--accent-fill);
-}
-
-.rooms {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.room {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: 10px 12px 10px 16px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  background: var(--surface-glass);
-  backdrop-filter: blur(8px);
-}
-
-.room[data-state="ON"] {
-  border-color: color-mix(in srgb, var(--accent-fill) 70%, var(--border));
-  background: color-mix(in srgb, var(--accent-fill) 8%, var(--surface-glass));
-}
-
-.room[data-state="ERROR"] {
-  border-color: color-mix(in srgb, var(--warn) 50%, var(--border));
-}
-
-.room-text {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.room .badge {
-  flex: none;
-  margin-top: 0;
-  padding-top: 0;
-}
-
-.room-value {
-  overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.room-off {
-  flex: none;
-  min-height: 32px;
-  padding: 2px 10px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  font-family: var(--font-label);
-  font-size: 0.66rem;
-  letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .tile-error {

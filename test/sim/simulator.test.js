@@ -26,7 +26,6 @@ let cookie;
 let watch;
 let target;
 let page;
-let room;
 const macros = [];
 
 async function sim(method, pathname, body) {
@@ -91,7 +90,6 @@ before(async () => {
 after(async () => {
   remote?.stop();
   if (server) await new Promise((resolve) => server.close(resolve));
-  if (room) await sim('DELETE', `/api/activity_groups/${room}`).catch(() => {});
   for (const id of macros) await sim('DELETE', `/api/macros/${id}`).catch(() => {});
   for (const made of await sim('GET', '/api/auth/api_keys').catch(() => [])) {
     if (made.name === 'ucweb') await sim('DELETE', `/api/auth/api_keys/${made.key_id}`).catch(() => {});
@@ -229,31 +227,6 @@ test('editing a page on the remote reaches ucweb live', async () => {
   }
   const { pages } = await (await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/pages`)).json();
   assert.equal(pages.find((candidate) => candidate.id === page).name, `${RUN} renamed page`);
-});
-
-test('an activity group made on the remote becomes a room, and turning the room off stops what runs in it', async () => {
-  assert.equal((await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/activities/${watch}/power`, { method: 'POST', body: '{"on":true}' })).status, 200);
-  await waitFor(async () => (await simActivity(watch)).attributes.state === 'ON', { timeoutMs: 10000, message: 'watch ON at the simulator' });
-  room = (await sim('POST', '/api/activity_groups', { name: { en: `${RUN} room` }, activity_ids: [watch, target] })).group_id;
-  await sim('PATCH', `/api/activities/${watch}`, { description: { en: 'grouped by the ucweb simulator suite' } });
-  const listed = await waitFor(() => remote.snapshot().groups?.find((group) => group.id === room), { timeoutMs: 10000, message: `ucweb read the group: ${JSON.stringify(remote.snapshot().groups)}` });
-  assert.equal(listed.name, `${RUN} room`);
-  assert.deepEqual([...listed.activityIds].sort(), [watch, target].sort());
-  await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'ACTIVE', { timeoutMs: 10000, message: 'room ACTIVE' });
-  const running = [];
-  for (const id of listed.activityIds) {
-    const state = (await simActivity(id)).attributes.state;
-    await waitFor(() => ucwebActivity(id)?.state === state, { timeoutMs: 10000, message: `ucweb agrees ${id} is ${state}` });
-    if (['ON', 'RUNNING'].includes(state)) running.push(id);
-  }
-  assert.ok(running.length > 0, 'something in the room is on at the simulator');
-  const response = await ucweb(`/api/remotes/${encodeURIComponent(SIM)}/groups/${room}/off`, { method: 'POST', body: '{}' });
-  assert.equal(response.status, 200);
-  assert.deepEqual((await response.json()).stopped, running.map((id) => ucwebActivity(id).name));
-  for (const id of running) {
-    await waitFor(async () => (await simActivity(id)).attributes.state === 'OFF', { timeoutMs: 10000, message: `the room off stopped ${id}` });
-  }
-  await waitFor(() => remote.snapshot().groups.find((group) => group.id === room).state === 'OFF', { timeoutMs: 10000, message: 'room OFF live' });
 });
 
 test('an unmapped button is refused before it reaches the remote', async () => {

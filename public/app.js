@@ -75,7 +75,6 @@ const state = {
   systemTimer: null,
   systemBusy: false,
   haptics: true,
-  roomsBusy: new Set(),
   readiness: new Map(),
 };
 
@@ -481,61 +480,6 @@ function renderStatus(remote) {
   const children = [connection, battery, powerSupply, mode, device];
   if (remote.problem && !remote.online) children.push(el('p', 'problem', remote.problem));
   container.replaceChildren(...children);
-}
-
-const ROOM_STATES = { ACTIVE: 'ON', RUNNING: 'RUNNING', ERROR: 'ERROR', OFF: 'OFF' };
-
-function roomsOf(remote) {
-  const groups = remote?.groups;
-  if (!groups || !groups.some((group) => group.id !== 'default')) return [];
-  return groups;
-}
-
-async function roomOff(remote, group) {
-  const key = `${remote.id}\n${group.id}`;
-  if (state.roomsBusy.has(key)) return;
-  state.roomsBusy.add(key);
-  renderRooms(remote);
-  flashLogo();
-  try {
-    await api(`/api/remotes/${encodeURIComponent(remote.id)}/groups/${encodeURIComponent(group.id)}/off`, { method: 'POST', body: '{}' });
-  } catch (error) {
-    toast(error.message);
-  } finally {
-    state.roomsBusy.delete(key);
-    renderRooms(currentRemote());
-  }
-}
-
-function roomCard(remote, group) {
-  const shown = ROOM_STATES[group.state] ?? 'OFF';
-  const card = el('div', 'room');
-  card.dataset.state = shown;
-  const running = group.activityIds
-    .map((id) => remote.activities.find((activity) => activity.id === id))
-    .filter((activity) => activity && ACTIVE_STATES.has(activity.state))
-    .map((activity) => activity.name);
-  const text = el('div', 'room-text');
-  const idle = shown === 'ERROR' ? 'The last run failed' : STATE_LABELS[shown];
-  text.append(el('span', 'label', group.name), el('span', 'room-value', running.length ? running.join(', ') : idle));
-  card.append(text);
-  if (shown !== 'OFF') card.append(el('span', 'badge', STATE_LABELS[shown]));
-  if (shown === 'ON' || shown === 'RUNNING') {
-    const off = el('button', 'room-off', 'Turn off');
-    off.type = 'button';
-    off.disabled = !remote.online || state.roomsBusy.has(`${remote.id}\n${group.id}`);
-    off.setAttribute('aria-label', `Turn off everything in ${group.name}`);
-    off.addEventListener('click', () => roomOff(remote, group));
-    card.append(off);
-  }
-  return card;
-}
-
-function renderRooms(remote) {
-  const container = $('rooms');
-  const rooms = roomsOf(remote);
-  container.hidden = rooms.length === 0;
-  container.replaceChildren(...rooms.map((group) => roomCard(remote, group)));
 }
 
 async function setPower(remote, activity, on) {
@@ -1255,7 +1199,6 @@ function render() {
   renderSectionMeta(remote);
   renderTabs();
   renderStatus(remote);
-  renderRooms(remote);
   renderNav(remote);
   renderMain(remote);
   renderControl(remote);

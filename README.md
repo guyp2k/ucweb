@@ -56,8 +56,6 @@ The screenshots use made-up remotes, activities and music.
 - **Player**: tap a media widget's artwork for the full player: large artwork, title, artist and album, a seek bar, play and
   pause, previous, next, stop, shuffle, repeat, volume and source. It offers only the controls that player reports it
   supports, and the server checks every command against that list before sending it.
-- **Rooms**: the remote's activity groups (one per room, as set up in the web configurator) under the status,
-  each showing what is running in it, with one **Turn off** for the whole room.
 - **Live status**: connection, battery level and charging, power supply, power mode (awake, idle, low power,
   asleep) and the device's model and firmware, updated as they change. When the battery cannot be read right now,
   or the remote is offline, the last reading is shown dimmed with its age ("Last read 4 min ago") instead of n/a.
@@ -215,12 +213,6 @@ integration that is not connected. Five steps blocked by one cause show as one r
 **Activities.** Every activity on the selected remote, with its live state. Tap one that is off to start it, tap a
 running one to control it, and use **Turn off** to stop it. Switch remotes with the tabs at the top; each tab shows
 that remote's battery.
-
-**Rooms.** If the remote has activity groups besides its Default group, each one appears under Status with what is
-running in it (or Off, or that the last run failed). **Turn off** stops every activity in that room that is on or
-starting. Groups are read when ucweb connects, when the remote wakes and when an activity is added, renamed or
-deleted. The remote sends no event when a group is edited, so a group change made in the web configurator shows up
-at the next of those, or when the ucweb container restarts.
 
 **Pages and controls.** A running activity shows its pages, laid out on the grid you built in the web configurator,
 or the control pad. The **Pages | Controls** switch flips between them (`T` on a keyboard). Swipe, use the arrows
