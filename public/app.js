@@ -1,4 +1,5 @@
 import { batteryFill } from './battery.js';
+import { canVibrate, tap } from './haptics.js';
 import { createPager } from './pages.js';
 import { createBrowser } from './browser.js';
 import { createChooser } from './chooser.js';
@@ -7,7 +8,7 @@ import { createDeviceTiles, icon, iconFor, renderIntegrations, stateLabel, TYPE_
 
 const $ = (id) => document.getElementById(id);
 
-const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote', pages: 'ucweb.pages', view: 'ucweb.view', screen: 'ucweb.screen' };
+const STORAGE = { theme: 'ucweb.theme', remote: 'ucweb.remote', pages: 'ucweb.pages', view: 'ucweb.view', screen: 'ucweb.screen', haptics: 'ucweb.haptics' };
 const PINNED_NAV = '(min-width: 1200px)';
 const ALL_ACTIVITIES = { id: '', name: 'Activities', items: null };
 const REPEAT_DELAY_MS = 400;
@@ -68,6 +69,7 @@ const state = {
   systemArmed: null,
   systemTimer: null,
   systemBusy: false,
+  haptics: true,
 };
 
 function load(key) {
@@ -135,7 +137,8 @@ function toast(message, { ok = false } = {}) {
   }, 4500);
 }
 
-function flashLogo() {
+function flashLogo({ repeat = false } = {}) {
+  if (!repeat) tap(navigator, state.haptics, touchScreen());
   for (const logo of document.querySelectorAll('.logo')) {
     logo.classList.remove('is-sending');
     void logo.getBoundingClientRect();
@@ -184,6 +187,7 @@ function setSignedIn(signedIn) {
   if (!signedIn) closeNav();
   $('remote-tabs').hidden = !signedIn;
   $('sign-out').hidden = !signedIn;
+  $('haptics-group').hidden = !signedIn || !canVibrate(navigator, touchScreen());
   if (!signedIn) $('banner').hidden = true;
 }
 
@@ -1131,12 +1135,12 @@ function render() {
   renderSystem(remote);
 }
 
-async function press(button) {
+async function press(button, { repeat = false } = {}) {
   const remote = currentRemote();
   const target = controlledTarget(remote);
   if (!remote || !target || state.inflight.has(button)) return;
   state.inflight.add(button);
-  flashLogo();
+  flashLogo({ repeat });
   try {
     await api(`${targetPath(remote, target)}/buttons/${encodeURIComponent(button)}`, { method: 'POST', body: '{}' });
   } catch (error) {
@@ -1163,7 +1167,7 @@ function initPad() {
     press(key.dataset.button);
     stopRepeat();
     delayTimer = setTimeout(() => {
-      repeatTimer = setInterval(() => press(key.dataset.button), REPEAT_EVERY_MS);
+      repeatTimer = setInterval(() => press(key.dataset.button, { repeat: true }), REPEAT_EVERY_MS);
     }, REPEAT_DELAY_MS);
   });
   for (const type of ['pointerup', 'pointerleave', 'pointercancel']) pad.addEventListener(type, stopRepeat);
@@ -1203,11 +1207,28 @@ function initPad() {
     if (!key || key.hidden || key.disabled) return;
     if (event.repeat && !key.hasAttribute('data-repeat')) return;
     event.preventDefault();
-    press(button);
+    press(button, { repeat: event.repeat });
+  });
+}
+
+function initHaptics() {
+  const toggle = $('haptics');
+  const show = () => {
+    toggle.setAttribute('aria-pressed', String(state.haptics));
+    $('haptics-state').textContent = state.haptics ? 'On' : 'Off';
+  };
+  state.haptics = load(STORAGE.haptics) !== 'off';
+  show();
+  toggle.addEventListener('click', () => {
+    state.haptics = !state.haptics;
+    save(STORAGE.haptics, state.haptics ? 'on' : 'off');
+    show();
+    tap(navigator, state.haptics, touchScreen());
   });
 }
 
 const navPinned = () => matchMedia(PINNED_NAV).matches;
+const touchScreen = () => matchMedia('(any-pointer: coarse)').matches;
 
 function syncNav() {
   const nav = $('nav');
@@ -1310,6 +1331,7 @@ async function boot() {
   initViewSwitch();
   initPad();
   initSystem();
+  initHaptics();
   try {
     await initThemes();
     const session = await api('/api/session');
