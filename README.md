@@ -34,7 +34,8 @@ The screenshots use made-up remotes, activities and music.
 - **Control pad**: D-pad and OK, back, home, menu, volume, mute, channel, play/pause, previous, next, stop and
   record. Each button sends exactly what the activity's own button mapping sends; buttons the activity does not
   use are dimmed, and buttons it does not have are hidden. Hold volume, channel or an arrow to repeat. On a
-  desktop the keyboard works too: arrows, Enter, Backspace, + and -, M and Space.
+  desktop the keyboard works too: arrows, Enter, Backspace, + and -, M and Space. On a phone that can vibrate,
+  every press gives a short buzz.
 - **Activity pages**: the pages you built for each activity in the web configurator, laid out on the same grid.
   Swipe, use the arrows or dots, or press `[` and `]` to slide between them; the home button beside the page name (or
   `0`) slides back to the first page. A Pages | Controls switch (or `T` on a
@@ -259,6 +260,10 @@ disconnected, error) as it changes.
 it off. Reboot and power off ask you to tap twice.
 
 **Themes.** Pick one from the menu at the top. Each browser keeps its own choice.
+
+**Vibration.** On a phone whose browser can vibrate (Chrome and most Android browsers; iPhones cannot), every
+button press gives a 10 ms buzz; held buttons buzz once, not on every repeat. **Vibrate on press** in the menu
+turns it off for that browser. Browsers that cannot vibrate, and computers without a touch screen, do not show it.
 
 <p align="center">
   <img src="docs/screenshots/theme-miyara.webp" width="220" alt="Miyara theme">

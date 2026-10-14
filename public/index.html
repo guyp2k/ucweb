@@ -108,6 +108,18 @@
           </button>
         </li>
       </ul>
+      <div class="nav-device" id="haptics-group" hidden>
+        <p class="nav-label" id="nav-device-label">This phone</p>
+        <ul class="nav-list" aria-labelledby="nav-device-label">
+          <li>
+            <button class="nav-item haptics-button" id="haptics" type="button" aria-pressed="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM3 9v6M21 9v6"/></svg>
+              <span class="nav-text">Vibrate on press</span>
+              <span class="nav-count haptics-state" id="haptics-state">On</span>
+            </button>
+          </li>
+        </ul>
+      </div>
     </nav>
     <div class="nav-scrim" id="nav-scrim" hidden></div>
 
