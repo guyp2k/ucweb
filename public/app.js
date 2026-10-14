@@ -165,7 +165,7 @@ function applyTheme(id) {
   link.href = href;
 }
 
-async function initThemes() {
+async function loadThemes() {
   const config = await api('/api/config');
   state.themes = config.themes;
   const select = $('theme-select');
@@ -176,6 +176,10 @@ async function initThemes() {
   }));
   const saved = load(STORAGE.theme);
   applyTheme(config.themes.some((theme) => theme.id === saved) ? saved : config.defaultTheme);
+}
+
+function initThemePicker() {
+  const select = $('theme-select');
   select.addEventListener('change', () => {
     save(STORAGE.theme, select.value);
     applyTheme(select.value);
@@ -1416,14 +1420,26 @@ async function boot() {
   initPad();
   initSystem();
   initHaptics();
+  initThemePicker();
   setInterval(tickAges, AGE_TICK_MS);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch((error) => console.warn(`ucweb works without offline start: ${error.message}`));
+  }
+  await start();
+}
+
+async function start(attempt = 0) {
+  const banner = $('banner');
   try {
-    await initThemes();
+    await loadThemes();
     const session = await api('/api/session');
+    banner.hidden = true;
     if (session.authenticated) startApp();
     else showLogin(session.pinConfigured);
   } catch (error) {
-    toast(`ucweb could not start: ${error.message}`);
+    banner.textContent = `Can't reach ucweb (${error.message}). Trying again...`;
+    banner.hidden = false;
+    setTimeout(() => start(attempt + 1), RECONNECT_MS[Math.min(attempt, RECONNECT_MS.length - 1)]);
   }
 }
 

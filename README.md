@@ -268,6 +268,15 @@ disconnected, error) as it changes.
 **Remote panel.** At the bottom of the page: open the remote's own web configurator, reboot the remote, or power
 it off. Reboot and power off ask you to tap twice.
 
+**On your phone's home screen.** On an iPhone, open ucweb in Safari, tap Share, then **Add to Home Screen**: it
+opens full screen with its own icon. On Android, use Chrome's menu, **Add to Home screen** (or **Install app**).
+Served over plain `http://` (the usual LAN setup), Android adds a shortcut rather than a full app install.
+
+If ucweb is served over HTTPS (for example behind a reverse proxy with a certificate), it also installs as a full
+app on Android and opens even when the server can't be reached: the page loads from the phone and says it is
+trying to reach ucweb until it can. Browsers only allow this offline start on HTTPS. Commands, states and
+everything else from the remotes are never saved on the phone; ucweb needs the server for those.
+
 **Themes.** Pick one from the menu at the top. Each browser keeps its own choice.
 
 **Vibration.** On a phone whose browser can vibrate (Chrome and most Android browsers; iPhones cannot), every
@@ -331,7 +340,9 @@ npm run lint
 UC_REMOTES=192.168.1.20 UCWEB_CONFIG_DIR=./dev npm start
 ```
 
-Node 20 or later. The browser code is plain ES modules with no build step.
+Node 20 or later. The browser code is plain ES modules with no build step. The home screen icons in
+`public/icons` are made from `public/favicon.svg` by `scripts/build-icons.sh` (needs ImageMagick); run it again
+after changing the logo.
 
 ### Against the Unfolded Circle core simulator
 
