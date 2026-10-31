@@ -57,3 +57,15 @@ test('on a phone only the activities page puts the running activity\'s controls 
   assert.match(desktop.slice(0, desktop.indexOf('\n}\n')), /\.layout\.has-active:not\(\.shows-devices\) \.control \{\s*order: 0;/);
   assert.match(app, /classList\.toggle\('shows-devices', !onlyActivities\)/);
 });
+
+test('a bar pinned to the top of the screen is opaque, so scrolled text never reads through it', async () => {
+  const css = await read('styles.css');
+  const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, , body]) => /position: (sticky|fixed);/.test(body) && /\btop: 0;/.test(body));
+  assert.ok(blocks.some(([, selector]) => selector.trim() === '.topbar'), 'the top bar is pinned at top: 0');
+  for (const [, selector, body] of blocks) {
+    const background = body.match(/background: ([^;]+);/)?.[1];
+    assert.ok(background, `${selector.trim()} has a background`);
+    assert.doesNotMatch(background, /transparent|rgba\(|color-mix\([^)]*%\s*,\s*transparent/, `${selector.trim()} background ${background} lets content through`);
+    assert.doesNotMatch(body, /backdrop-filter/, `${selector.trim()} relies on a blur`);
+  }
+});

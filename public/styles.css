@@ -225,8 +225,7 @@ svg {
   align-items: center;
   gap: 12px 24px;
   padding: max(10px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 10px max(20px, env(safe-area-inset-left));
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
-  backdrop-filter: blur(14px) saturate(1.2);
+  background: var(--bg);
   border-bottom: 1px solid var(--hairline);
 }
 
