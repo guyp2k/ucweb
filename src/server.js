@@ -52,9 +52,9 @@ export async function discoverThemes(publicDir) {
   for (const entry of await readdir(themesDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const manifest = JSON.parse(await readFile(path.join(themesDir, entry.name, 'theme.json'), 'utf8'));
-    themes.push({ id: entry.name, name: manifest.name, colorScheme: manifest.colorScheme });
+    themes.push({ id: entry.name, name: manifest.name, colorScheme: manifest.colorScheme, order: manifest.order });
   }
-  return themes.sort((a, b) => a.name.localeCompare(b.name));
+  return themes.sort((a, b) => a.order - b.order);
 }
 
 function sendJson(res, status, body, headers = {}) {

@@ -61,8 +61,9 @@ The screenshots use made-up remotes, activities and music.
   or the remote is offline, the last reading is shown dimmed with its age ("Last read 4 min ago") instead of n/a.
 - **Several remotes**: switch between them at the top of the page.
 - **PIN sign-in**: one PIN for the whole app, kept as a scrypt hash. A browser stays signed in for 30 days.
-- **Themes**: Miyara (the default), Pat's Blue, Original, Obsidian & Copper, Roon Dark, Roon Light, Dark Orange,
-  Graphite & Brass, Brookwood and Brookwood Light. Each browser keeps its own choice.
+- **Themes**: Mindshovel Colorful, Mindshovel Colorful Light, Mindshovel Dark, Mindshovel Light, Mindshovel Blue,
+  Mindshovel Dark Orange, Obsidian & Copper, Graphite & Brass and Miyara (the default), the same set as
+  [brookwoodav.com](https://brookwoodav.com). Each browser keeps its own choice.
 
 ucweb only controls. It never changes a remote's configuration: use the remote's web configurator for that.
 Select widgets on activity pages show their current option but can't change it (select tiles on the remote's
@@ -281,17 +282,28 @@ app on Android and opens even when the server can't be reached: the page loads f
 trying to reach ucweb until it can. Browsers only allow this offline start on HTTPS. Commands, states and
 everything else from the remotes are never saved on the phone; ucweb needs the server for those.
 
-**Themes.** Pick one from the menu at the top. Each browser keeps its own choice.
+**Themes.** Pick one from the menu at the top right (on a phone, the palette button). Each browser keeps its own
+choice. The nine themes match [brookwoodav.com](https://brookwoodav.com), in the same order:
+
+<p align="center">
+  <img src="docs/screenshots/theme-original.webp" width="220" alt="Mindshovel Colorful theme">
+  <img src="docs/screenshots/theme-colorful-light.webp" width="220" alt="Mindshovel Colorful Light theme">
+  <img src="docs/screenshots/theme-roon.webp" width="220" alt="Mindshovel Dark theme">
+</p>
+<p align="center">
+  <img src="docs/screenshots/theme-roon-light.webp" width="220" alt="Mindshovel Light theme">
+  <img src="docs/screenshots/theme-pats-blue.webp" width="220" alt="Mindshovel Blue theme">
+  <img src="docs/screenshots/theme-dark-orange.webp" width="220" alt="Mindshovel Dark Orange theme">
+</p>
+<p align="center">
+  <img src="docs/screenshots/theme-copper.webp" width="220" alt="Obsidian and Copper theme">
+  <img src="docs/screenshots/theme-graphite-brass.webp" width="220" alt="Graphite and Brass theme">
+  <img src="docs/screenshots/theme-miyara.webp" width="220" alt="Miyara theme">
+</p>
 
 **Vibration.** On a phone whose browser can vibrate (Chrome and most Android browsers; iPhones cannot), every
 button press gives a 10 ms buzz; held buttons buzz once, not on every repeat. **Vibrate on press** in the menu
 turns it off for that browser. Browsers that cannot vibrate, and computers without a touch screen, do not show it.
-
-<p align="center">
-  <img src="docs/screenshots/theme-miyara.webp" width="220" alt="Miyara theme">
-  <img src="docs/screenshots/theme-roon-light.webp" width="220" alt="Roon Light theme">
-  <img src="docs/screenshots/theme-graphite-brass.webp" width="220" alt="Graphite and Brass theme">
-</p>
 
 ## Updating
 
@@ -323,7 +335,7 @@ keys, PIN and sign-ins are kept in `/config`.
 | `UCWEB_CONFIG_DIR` | `/config` | Holds `keys/`, `pin.hash` and `session.secret`. |
 | `UC_KEYS_DIR` | `$UCWEB_CONFIG_DIR/keys` | Where the `<hostname>.key` files are. |
 | `PORT` | `8080` | Port the web app listens on. |
-| `UCWEB_THEME` | `miyara` | Theme for browsers that have not picked one: `miyara`, `pats-blue`, `original`, `copper`, `roon`, `roon-light`, `dark-orange`, `graphite-brass`, `brookwood` or `brookwood-light`. |
+| `UCWEB_THEME` | `miyara` | Theme for browsers that have not picked one: `miyara`, `original`, `colorful-light`, `roon`, `roon-light`, `pats-blue`, `dark-orange`, `copper` or `graphite-brass`. The menu shows them by name: `original` is Mindshovel Colorful, `roon` Mindshovel Dark, `roon-light` Mindshovel Light and `pats-blue` Mindshovel Blue. |
 | `PUID` / `PGID` | `1000` | Owner of the config folder. The container fixes the folder's ownership at start and then drops root. Unraid uses 99 and 100. |
 
 ## Security
@@ -367,9 +379,9 @@ use only and is never part of the ucweb image.
 ## Credits
 
 - The Remote's API is documented in [unfoldedcircle/core-api](https://github.com/unfoldedcircle/core-api).
-- The Original, Obsidian & Copper, Roon Dark, Roon Light, Dark Orange, Graphite & Brass and Miyara themes
-  follow the themes of [Rabbit Hole Fork](https://github.com/guyp2k/RabbitHole-Fork). Graphite & Brass follows
-  [Rouen](https://github.com/meltface-80/Rouen).
+- The Mindshovel Colorful, Mindshovel Dark, Mindshovel Light, Mindshovel Dark Orange, Obsidian & Copper,
+  Graphite & Brass and Miyara themes follow the themes of [Rabbit Hole Fork](https://github.com/guyp2k/RabbitHole-Fork).
+  Graphite & Brass follows [Rouen](https://github.com/meltface-80/Rouen).
 - Fonts are under the SIL Open Font License; each theme's `fonts/LICENSE.txt` lists them.
 - Most page icons follow the geometry of [Lucide](https://lucide.dev) (ISC License); the connector icons are drawn
   for ucweb. See `public/icons.LICENSE.txt`.

@@ -338,6 +338,15 @@ svg {
   gap: 8px;
 }
 
+.theme-icon {
+  display: none;
+}
+
+.theme-icon circle {
+  fill: currentColor;
+  stroke: none;
+}
+
 .theme-picker select,
 .text-button {
   min-height: 34px;
@@ -2020,8 +2029,35 @@ a.system-button {
     display: none;
   }
 
+  .theme-picker {
+    position: relative;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: var(--surface-glass);
+    color: var(--muted);
+  }
+
+  .theme-picker .theme-icon {
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+
   .theme-picker select {
-    max-width: 128px;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    min-height: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .theme-picker:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .sign-out-text {
