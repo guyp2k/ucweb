@@ -4166,6 +4166,7 @@ body.has-nav-open {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--muted);
@@ -4186,17 +4187,43 @@ body.has-nav-open {
 }
 
 .intg-state.is-ok {
-  background: color-mix(in srgb, var(--ok) 16%, transparent);
-  color: var(--ok);
+  border-color: var(--on);
+  background: color-mix(in srgb, var(--on) 18%, transparent);
+  color: var(--text);
+}
+
+.intg-state.is-ok::before {
+  background: var(--on);
 }
 
 .intg-state.is-warn {
-  background: color-mix(in srgb, var(--warn) 16%, transparent);
-  color: var(--warn);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--text);
+}
+
+.intg-state.is-warn::before {
+  background: var(--danger);
 }
 
 .intg-state.is-busy {
-  color: var(--accent);
+  border-color: var(--caution);
+  background: color-mix(in srgb, var(--caution) 18%, transparent);
+  color: var(--text);
+}
+
+.intg-state.is-busy::before {
+  background: var(--caution);
+}
+
+.intg-state.is-idle {
+  border-color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  color: var(--text);
+}
+
+.intg-state.is-idle::before {
+  background: var(--muted);
 }
 
 .intg-state.is-busy::before {
