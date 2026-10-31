@@ -413,8 +413,13 @@ export function createDeviceTiles({ onCommand, onPlayer, onOpenPlayer, onOpenDev
 
 const DEVICE_STATES = {
   CONNECTED: ['Connected', 'is-ok'], CONNECTING: ['Connecting', 'is-busy'], DISCONNECTED: ['Disconnected', 'is-warn'], ERROR: ['Error', 'is-warn'],
-  UNKNOWN: ['Unknown', ''], ACTIVE: ['Active', 'is-ok'], IDLE: ['Idle', ''], RECONNECTING: ['Reconnecting', 'is-busy'], NOT_CONFIGURED: ['Not set up', ''],
+  UNKNOWN: ['Unknown', 'is-idle'], ACTIVE: ['Active', 'is-ok'], IDLE: ['Idle', 'is-idle'], RECONNECTING: ['Reconnecting', 'is-busy'], NOT_CONFIGURED: ['Not set up', 'is-idle'],
 };
+
+export function integrationStatus(item) {
+  if (item.enabled === false) return ['Disabled', 'is-idle'];
+  return Object.hasOwn(DEVICE_STATES, item.state) ? DEVICE_STATES[item.state] : ['Unknown', 'is-idle'];
+}
 
 function integrationRow(item) {
   const row = el('article', 'intg-row');
@@ -424,7 +429,7 @@ function integrationRow(item) {
   text.append(el('span', 'tile-name', item.name));
   const facts = [item.version ? `v${item.version}` : null, item.developer, item.kind].filter(Boolean).join(' · ');
   text.append(el('span', 'dev-sub', facts || 'No details reported'));
-  const [label, tone] = item.enabled === false ? ['Disabled', ''] : DEVICE_STATES[item.state] ?? ['Unknown', ''];
+  const [label, tone] = integrationStatus(item);
   const pill = el('span', `intg-state ${tone}`.trim(), label);
   row.append(lead, text, pill);
   return row;
