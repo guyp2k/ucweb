@@ -356,7 +356,7 @@ npm run lint
 UC_REMOTES=192.168.1.20 UCWEB_CONFIG_DIR=./dev npm start
 ```
 
-Node 20 or later. The browser code is plain ES modules with no build step. The home screen icons in
+Node 22 or later. The browser code is plain ES modules with no build step. The home screen icons in
 `public/icons` are made from `public/favicon.svg` by `scripts/build-icons.sh` (needs ImageMagick); run it again
 after changing the logo.
 
