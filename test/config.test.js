@@ -37,5 +37,5 @@ test('the keys folder defaults to keys inside the config folder', () => {
 
 test('the default theme is miyara unless UCWEB_THEME names another', () => {
   assert.equal(loadConfig({ UC_REMOTES: 'a' }).defaultTheme, 'miyara');
-  assert.equal(loadConfig({ UC_REMOTES: 'a', UCWEB_THEME: 'brookwood' }).defaultTheme, 'brookwood');
+  assert.equal(loadConfig({ UC_REMOTES: 'a', UCWEB_THEME: 'pats-blue' }).defaultTheme, 'pats-blue');
 });

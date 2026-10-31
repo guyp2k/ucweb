@@ -34,12 +34,18 @@ function hsl(hex) {
 
 const themes = await discoverThemes(publicDir);
 
-test('every theme Rabbit Hole has is offered under the same id and name', () => {
-  const byId = Object.fromEntries(themes.map((theme) => [theme.id, theme.name]));
-  assert.deepEqual(
-    { original: byId.original, copper: byId.copper, roon: byId.roon, 'roon-light': byId['roon-light'], 'dark-orange': byId['dark-orange'], 'graphite-brass': byId['graphite-brass'], miyara: byId.miyara },
-    { original: 'Original', copper: 'Obsidian & Copper', roon: 'Roon Dark', 'roon-light': 'Roon Light', 'dark-orange': 'Dark Orange', 'graphite-brass': 'Graphite & Brass', miyara: 'Miyara' },
-  );
+test('the theme menu lists the brookwoodav.com themes, by the same names and in the same order', () => {
+  assert.deepEqual(themes.map((theme) => [theme.id, theme.name]), [
+    ['original', 'Mindshovel Colorful'],
+    ['colorful-light', 'Mindshovel Colorful Light'],
+    ['roon', 'Mindshovel Dark'],
+    ['roon-light', 'Mindshovel Light'],
+    ['pats-blue', 'Mindshovel Blue'],
+    ['dark-orange', 'Mindshovel Dark Orange'],
+    ['copper', 'Obsidian & Copper'],
+    ['graphite-brass', 'Graphite & Brass'],
+    ['miyara', 'Miyara'],
+  ]);
 });
 
 for (const theme of themes) {
@@ -117,4 +123,17 @@ test('the logo goes back to its idle animation after the send pulse', async () =
     assert.match(sending, /^logo-(send|press) /, `${part} plays the pulse first`);
     assert.match(sending, new RegExp(`, ${idle} [^,]* infinite$`), `${part} resumes ${idle} forever after the pulse`);
   }
+});
+
+test('on a phone the theme menu is a palette icon over the whole list, so no theme name is cut short', async () => {
+  const [html, css] = await Promise.all([readFile(path.join(publicDir, 'index.html'), 'utf8'), readFile(path.join(publicDir, 'styles.css'), 'utf8')]);
+  const picker = html.slice(html.indexOf('<label class="theme-picker">'), html.indexOf('</label>', html.indexOf('<label class="theme-picker">')));
+  assert.match(picker, /<svg class="theme-icon"[^>]*aria-hidden="true"/);
+  assert.match(picker, /<select id="theme-select" aria-label="Theme">/);
+  const phone = css.slice(css.indexOf('@media (max-width: 640px) {'));
+  const block = (selector) => phone.slice(phone.indexOf(`  ${selector} {`), phone.indexOf('}', phone.indexOf(`  ${selector} {`)));
+  assert.match(block('.theme-picker select'), /position: absolute;\s*inset: 0;[\s\S]*opacity: 0;/);
+  assert.doesNotMatch(block('.theme-picker select'), /max-width/);
+  assert.match(block('.theme-picker .theme-icon'), /display: block;/);
+  assert.match(css.slice(0, css.indexOf('@media (max-width: 640px) {')), /\n\.theme-icon \{\s*display: none;/);
 });
