@@ -545,3 +545,39 @@ test('when the matching player\'s cover changes, the borrowing widget is updated
   assert.equal(after, seen.find((view) => view.id === 'media.roon').image);
   assert.deepEqual((await remote.mediaImage('media.dmp')).body, Buffer.from('ffd8ffe1', 'hex'));
 });
+
+async function connectWithArtAt(url, art) {
+  await connect({ art });
+  const players = structuredClone(entities);
+  players['media.dmp'].attributes.media_image_url = url(fake.address);
+  fake.state.entities = players;
+  await remote.pages('act.tv');
+}
+
+test('artwork at an address with a login is fetched using that login, decoded, as basic auth', async () => {
+  await connectWithArtAt((address) => `http://viewer:p%40ss@${address}/art/cover.png`, { 'cover.png': { type: 'image/png', body: PNG } });
+  const image = await remote.mediaImage('media.dmp');
+  assert.deepEqual(image.body, PNG);
+  assert.equal(fake.state.artAuthorization, `Basic ${Buffer.from('viewer:p@ss').toString('base64')}`);
+});
+
+test('artwork from a server that names no content type is recognized from its bytes', async () => {
+  const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16]);
+  const WEBP = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 ')]);
+  const GIF = Buffer.from('GIF89a');
+  for (const [body, type] of [[PNG, 'image/png'], [JPEG, 'image/jpeg'], [WEBP, 'image/webp'], [GIF, 'image/gif']]) {
+    await connectWithArtAt((address) => `http://${address}/art/cover`, { cover: { body } });
+    const image = await remote.mediaImage('media.dmp');
+    assert.equal(image.type, type);
+    assert.deepEqual(image.body, body);
+    remote.stop();
+    remote = null;
+    await fake.close();
+    fake = null;
+  }
+});
+
+test('a response with no content type that is not an image is refused', async () => {
+  await connectWithArtAt((address) => `http://${address}/art/page`, { page: { body: Buffer.from('<html>') } });
+  await assert.rejects(remote.mediaImage('media.dmp'), (error) => error.status === 502 && /format/.test(error.message));
+});

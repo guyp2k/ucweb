@@ -76,7 +76,7 @@ export async function startFakeRemote({
       state.artAuthorization = req.headers.authorization;
       const found = state.art[decodeURIComponent(artwork[1])];
       if (!found) return send(res, 404, { message: 'no art' });
-      res.writeHead(200, { 'content-type': found.type });
+      res.writeHead(200, found.type ? { 'content-type': found.type } : {});
       return res.end(found.body);
     }
     const pinAuth = req.headers.authorization === `Basic ${Buffer.from(`web-configurator:${state.pin}`).toString('base64')}`;
