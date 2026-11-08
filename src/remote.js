@@ -482,6 +482,14 @@ function imageType(contentType) {
   return IMAGE_TYPES.has(type) ? type : null;
 }
 
+function sniffedImageType(body) {
+  if (body.subarray(0, 4).equals(PNG_MAGIC)) return 'image/png';
+  if (body.subarray(0, 3).equals(JPEG_MAGIC)) return 'image/jpeg';
+  if (body.subarray(0, 4).toString('latin1') === 'GIF8') return 'image/gif';
+  if (body.subarray(0, 4).toString('latin1') === 'RIFF' && body.subarray(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
+  return null;
+}
+
 async function readCapped(response, limit) {
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > limit) throw new HttpError(502, 'The image is too large.');
@@ -704,23 +712,30 @@ export class Remote extends EventEmitter {
     }
     if (/^[A-Za-z0-9+/=\s]{64,}$/.test(url)) {
       const body = Buffer.from(url, 'base64');
-      const type = body.subarray(0, 4).equals(PNG_MAGIC) ? 'image/png' : body.subarray(0, 3).equals(JPEG_MAGIC) ? 'image/jpeg' : null;
+      const type = sniffedImageType(body);
       if (!type) throw new HttpError(502, 'The artwork is in a format ucweb does not show.');
       if (body.length > MAX_IMAGE_BYTES) throw new HttpError(502, 'The image is too large.');
       return { type, body };
     }
     let parsed;
+    let login = null;
     try {
       parsed = new URL(url);
+      if (parsed.username || parsed.password) login = `${decodeURIComponent(parsed.username)}:${decodeURIComponent(parsed.password)}`;
     } catch {
       throw new HttpError(502, 'The artwork address is not valid.');
     }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new HttpError(502, 'The artwork address is not a web address.');
-    const response = await this.#fetchArtwork(parsed.href);
+    parsed.username = '';
+    parsed.password = '';
+    const response = await this.#fetchArtwork(parsed.href, login ? { authorization: `Basic ${Buffer.from(login).toString('base64')}` } : {});
     if (!response.ok) throw new HttpError(502, `The artwork answered HTTP ${response.status}.`);
-    const type = imageType(response.headers.get('content-type'));
+    const declared = response.headers.get('content-type');
+    if (declared && !imageType(declared)) throw new HttpError(502, 'The artwork is in a format ucweb does not show.');
+    const body = await readCapped(response, MAX_IMAGE_BYTES);
+    const type = imageType(declared) ?? sniffedImageType(body);
     if (!type) throw new HttpError(502, 'The artwork is in a format ucweb does not show.');
-    return { type, body: await readCapped(response, MAX_IMAGE_BYTES) };
+    return { type, body };
   }
 
   async browse(entityId, { mediaId, mediaType, page = 1 } = {}) {
@@ -1304,9 +1319,9 @@ export class Remote extends EventEmitter {
     }
   }
 
-  async #fetchArtwork(url) {
+  async #fetchArtwork(url, headers) {
     try {
-      return await fetch(url, { signal: AbortSignal.timeout(this.#timeoutMs) });
+      return await fetch(url, { headers, signal: AbortSignal.timeout(this.#timeoutMs) });
     } catch (error) {
       throw new HttpError(504, `The artwork server did not answer (${error.cause?.code ?? error.name}).`);
     }
