@@ -69,3 +69,15 @@ test('every panel on the main page has a titled section head', async () => {
   assert.equal((main.match(/<section\b/g) ?? []).length, 5);
   assert.match(main, /<div class="status" id="status" aria-live="polite"><\/div>/);
 });
+
+test('now-playing art is shown whole at any shape, and only the blurred backdrops crop', async () => {
+  const css = await readFile(path.join(publicDir, 'styles.css'), 'utf8');
+  const fit = (selector) => css.match(new RegExp(`\\n${selector.replace(/[.]/g, '\\.')} \\{[^}]*?object-fit: ([a-z]+);`))?.[1];
+  for (const selector of ['.media-art-image', '.player-art-image', '.dev-art img']) assert.equal(fit(selector), 'contain', selector);
+  for (const selector of ['.media-backdrop-image', '.player-backdrop-image']) assert.equal(fit(selector), 'cover', selector);
+  const rule = (selector) => css.match(new RegExp(`\\n${selector.replace(/[.]/g, '\\.')} \\{([^}]*)\\}`))[1];
+  for (const [image, frame] of [['.media-art-image', '.media-art'], ['.player-art-image', '.player-art']]) {
+    assert.match(rule(image), /position: absolute;\s*inset: 0;/, `${image} is pinned to its frame, so a tall image cannot overflow and be clipped`);
+    assert.match(rule(frame), /position: relative;/, `${frame} is the frame the image is pinned to`);
+  }
+});
