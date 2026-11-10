@@ -294,7 +294,7 @@ test('device commands from the interface keep an entity a command already names'
 
 test('profile pages read groups only when a page has one', () => {
   const pages = toProfilePages([{ page_id: 'a', name: { en: 'A' }, items: [{ group_id: 'g' }] }], [{ group_id: 'g', name: 'G', entities: ['x', 7, ''] }]);
-  assert.deepEqual(pages, [{ id: 'a', name: 'A', items: [{ group: { id: 'g', name: 'G', entityIds: ['x'] } }] }]);
+  assert.deepEqual(pages, [{ id: 'a', name: 'A', imageWords: [], items: [{ group: { id: 'g', name: 'G', entityIds: ['x'] } }] }]);
 });
 
 test('live changes reach listed devices, new entities join the list, and a changed device drops its cached pages', async () => {
@@ -501,4 +501,21 @@ test('a camera picture keeps its age when the page is opened again, and loses it
   fake.state.entities['cctv.cams'].attributes.media_image_url = 'data:image/jpeg;base64,DDDD';
   const different = await remote.pages('act.cams');
   assert.equal(different.entities['cctv.cams'].imageAt, null);
+});
+
+test('a page named only with spaces takes its name from its title image, and a real name wins', () => {
+  const pages = toProfilePages([
+    { page_id: 'a', pos: 1, name: ' ', image: 'custom:title6-watch.jpg', items: [] },
+    { page_id: 'b', pos: 2, name: '      ', image: 'custom:title6-smart-home.jpg', items: [] },
+    { page_id: 'c', pos: 3, name: '   ', image: 'custom:title7-remotes.jpg', items: [] },
+    { page_id: 'd', pos: 4, name: { en: 'Lights' }, image: 'custom:title6-cameras.jpg', items: [] },
+    { page_id: 'e', pos: 5, name: '  ', items: [] },
+  ]);
+  assert.deepEqual(pages.map((page) => [page.name, page.imageWords]), [
+    ['Watch', ['watch']],
+    ['Smart Home', ['smart', 'home']],
+    ['Remotes', ['remotes']],
+    ['Lights', ['cameras']],
+    ['Page', []],
+  ]);
 });

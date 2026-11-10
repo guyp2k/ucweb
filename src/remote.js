@@ -221,6 +221,12 @@ export function deviceMapping(entity) {
 
 const text = (value) => (typeof value === 'string' && value ? value : null);
 
+function imageWords(image) {
+  if (typeof image !== 'string') return [];
+  const file = image.replace(/^[a-z]+:/i, '').split('/').pop().replace(/\.[a-z0-9]+$/i, '');
+  return file.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word && !/^title\d*$/.test(word) && !/^\d+$/.test(word));
+}
+
 export function toProfilePages(rawPages, rawGroups = []) {
   const groups = new Map((Array.isArray(rawGroups) ? rawGroups : [])
     .filter((group) => typeof group?.group_id === 'string')
@@ -229,9 +235,13 @@ export function toProfilePages(rawPages, rawGroups = []) {
   return (Array.isArray(rawPages) ? rawPages : [])
     .filter((page) => typeof page?.page_id === 'string' && page.page_id)
     .sort(byPos)
-    .map((page) => ({
+    .map((page) => {
+      const words = imageWords(page.image);
+      const titled = words.map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
+      return {
       id: page.page_id,
-      name: localizedText(page.name) ?? 'Page',
+      name: String(localizedText(page.name) ?? '').trim() || titled || 'Page',
+      imageWords: words,
       items: (Array.isArray(page.items) ? [...page.items] : []).sort(byPos).flatMap((item) => {
         if (typeof item?.entity_id === 'string' && item.entity_id) return [{ entityId: item.entity_id }];
         const group = typeof item?.group_id === 'string' ? groups.get(item.group_id) : null;
@@ -239,7 +249,8 @@ export function toProfilePages(rawPages, rawGroups = []) {
         const entityIds = (Array.isArray(group.entities) ? group.entities : []).filter((id) => typeof id === 'string' && id);
         return [{ group: { id: group.group_id, name: localizedText(group.name) ?? 'Group', entityIds } }];
       }),
-    }));
+      };
+    });
 }
 
 const READINESS_TEXT = {

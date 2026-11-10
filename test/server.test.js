@@ -333,7 +333,7 @@ test('signing out clears the cookie', async () => {
 test('a signed-in browser reads the remote\'s pages, entities and integrations, and never an integration\'s setup data', async () => {
   const at = `/api/remotes/${encodeURIComponent(fake.address)}`;
   const profile = await (await authed(`${at}/profile`)).json();
-  assert.deepEqual(profile.pages, [{ id: 'lights', name: 'Lights', items: [{ entityId: 'light.desk', type: 'light' }] }]);
+  assert.deepEqual(profile.pages, [{ id: 'lights', name: 'Lights', imageWords: [], items: [{ entityId: 'light.desk', type: 'light' }] }]);
   assert.equal(profile.entities['light.desk'].name, 'Desk');
   const { entities } = await (await authed(`${at}/entities`)).json();
   assert.deepEqual(entities.map((entity) => entity.id), ['remote.amp', 'light.desk', 'macro.night', 'media.tv', 'sensor.vol']);
