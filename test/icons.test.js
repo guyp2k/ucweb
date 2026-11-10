@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ACTIONS, ICONS, resolveIcon, SOURCES, UC_NAMES } from '../public/icons.js';
+import { ACTIONS, ICONS, pageIconFor, resolveIcon, SOURCES, UC_NAMES } from '../public/icons.js';
 
 const shown = (icon, hint = null) => {
   const { key, glyph, caption, app } = resolveIcon({ icon, hint });
@@ -82,4 +82,10 @@ test('short port names only match whole words', () => {
   assert.deepEqual(shown('custom:search.png'), ['search', null]);
   assert.deepEqual(shown('custom:subtitles.png'), ['subtitles', null]);
   assert.deepEqual(shown('uc:nonsense-thing'), ['text', 'Nonsense Thing']);
+});
+
+test('a page icon comes from the words of its title image', () => {
+  const cases = [[['watch'], 'tv'], [['music'], 'music'], [['roon'], 'disc'], [['remotes'], 'remote'], [['smart', 'home'], 'house'], [['cameras'], 'camera'], [['living', 'room'], null], [[], null]];
+  for (const [words, expected] of cases) assert.equal(pageIconFor(words), expected, words.join(' '));
+  for (const [, key] of cases) if (key) assert.ok(ICONS[key], `${key} is drawn`);
 });

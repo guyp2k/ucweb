@@ -275,3 +275,15 @@ export function resolveIcon({ icon, hint }) {
   }
   return { key: null, glyph: null, caption: title(words(file || name || 'Button').join(' ')) || 'Button', app: false };
 }
+
+const PAGE_WORDS = { watch: 'tv', roon: 'disc' };
+
+export function pageIconFor(words) {
+  for (const word of words ?? []) {
+    for (const form of [word, word.replace(/s$/, '')]) {
+      const key = PAGE_WORDS[form] ?? UC_NAMES[form];
+      if (key && ICONS[key]) return key;
+    }
+  }
+  return null;
+}

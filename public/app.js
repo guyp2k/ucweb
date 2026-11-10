@@ -7,6 +7,7 @@ import { createBrowser } from './browser.js';
 import { createChooser } from './chooser.js';
 import { createPlayer } from './player.js';
 import { createDeviceTiles, icon, iconFor, renderIntegrations, stateLabel, TYPE_ICONS, TYPE_LABELS } from './devices.js';
+import { pageIconFor } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -582,6 +583,8 @@ function setScreen(id) {
 }
 
 function pageIcon(remote, page) {
+  const named = pageIconFor(page.imageWords);
+  if (named) return named;
   const first = page.items?.[0];
   const entry = first?.group ? first.group.items[0] : first;
   if (!entry) return page.items === null ? 'apps' : 'folder';
