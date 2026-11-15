@@ -103,6 +103,14 @@ export const ICONS = {
   flame: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z'],
   snowflake: ['M2 12h20', 'M12 2v20', 'm20 16-4-4 4-4', 'm4 8 4 4-4 4', 'm16 4-4 4-4-4', 'm8 20 4-4 4 4'],
   fan: [circle(12, 12, 1.5), 'M10.83 13.83a4 4 0 0 1-5.66-5.66l2.12 2.12', 'M13.17 10.17a4 4 0 0 1 5.66 5.66l-2.12-2.12', 'M10.17 10.83a4 4 0 0 1 5.66-5.66l-2.12 2.12', 'M13.83 13.17a4 4 0 0 1-5.66 5.66l2.12-2.12'],
+  ban: [circle(12, 12, 10), 'm4.9 4.9 14.2 14.2'],
+  'repeat-one': ['m17 2 4 4-4 4', 'M3 11v-1a4 4 0 0 1 4-4h14', 'm7 22-4-4 4-4', 'M21 13v1a4 4 0 0 1-4 4H3', 'M11 10h1v4'],
+  film: ['M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M7 3v18', 'M17 3v18', 'M3 12h18', 'M3 7.5h4', 'M3 16.5h4', 'M17 7.5h4', 'M17 16.5h4'],
+  'window-restore': ['M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z', 'M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2'],
+  language: ['m5 8 6 6', 'm4 14 6-6 2-3', 'M2 5h12', 'M7 2h1', 'm22 22-5-10-5 10', 'M14 18h6'],
+  'display-off': ['M17 17H4a2 2 0 0 1-2-2V5c0-1.5 1-2 1-2', 'M22 15V5a2 2 0 0 0-2-2H9', 'M8 21h8', 'M12 17v4', 'm2 2 20 20'],
+  'wave-square': ['M2 12h4V6h6v12h6v-6h4'],
+  waveform: ['M2 10v3', 'M6 6v11', 'M10 3v18', 'M14 8v7', 'M18 5v13', 'M22 10v3'],
 };
 
 export const UC_NAMES = {
@@ -131,6 +139,9 @@ export const UC_NAMES = {
   switch: 'plug', plug: 'plug', mediaplayer: 'music', 'media-player': 'music', remote: 'remote', cover: 'blinds', blinds: 'blinds',
   macro: 'zap', bolt: 'zap', button: 'button', camera: 'camera', video: 'camera', integration: 'puzzle', 'puzzle-piece': 'puzzle',
   droplet: 'droplet', speaker: 'speaker',
+  'arrow-right-long': 'arrow-right', 'sun-bright': 'sun', 'record-vinyl': 'disc', fire: 'flame', ban: 'ban', 'repeat-1': 'repeat-one',
+  film: 'film', 'window-restore': 'window-restore', language: 'language', 'display-slash': 'display-off', 'wave-square': 'wave-square',
+  'waveform-lines': 'waveform',
 };
 
 export const SOURCES = [
