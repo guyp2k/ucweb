@@ -89,3 +89,17 @@ test('a page icon comes from the words of its title image', () => {
   for (const [words, expected] of cases) assert.equal(pageIconFor(words), expected, words.join(' '));
   for (const [, key] of cases) if (key) assert.ok(ICONS[key], `${key} is drawn`);
 });
+
+test('every uc: icon the remotes use is drawn, not spelled out as text', () => {
+  const expected = {
+    'arrow-right-long': 'arrow-right', 'sun-bright': 'sun', 'record-vinyl': 'disc', fire: 'flame',
+    ban: 'ban', 'repeat-1': 'repeat-one', film: 'film', 'window-restore': 'window-restore', language: 'language',
+    'display-slash': 'display-off', 'wave-square': 'wave-square', 'waveform-lines': 'waveform',
+  };
+  for (const [name, key] of Object.entries(expected)) {
+    const resolved = resolveIcon({ icon: `uc:${name}` });
+    assert.equal(resolved.key, key, name);
+    assert.equal(resolved.caption, null, name);
+    assert.ok(ICONS[key], `${key} is drawn`);
+  }
+});
