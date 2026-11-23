@@ -224,7 +224,7 @@ const text = (value) => (typeof value === 'string' && value ? value : null);
 function imageWords(image) {
   if (typeof image !== 'string') return [];
   const file = image.replace(/^[a-z]+:/i, '').split('/').pop().replace(/\.[a-z0-9]+$/i, '');
-  return file.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word && !/^title\d*$/.test(word) && !/^\d+$/.test(word));
+  return file.split(/[^a-z0-9]+/i).filter((word) => word && !/^title\d*$/i.test(word) && !/^\d+$/.test(word));
 }
 
 export function toProfilePages(rawPages, rawGroups = []) {
@@ -241,7 +241,7 @@ export function toProfilePages(rawPages, rawGroups = []) {
       return {
       id: page.page_id,
       name: String(localizedText(page.name) ?? '').trim() || titled || 'Page',
-      imageWords: words,
+      imageWords: words.map((word) => word.toLowerCase()),
       items: (Array.isArray(page.items) ? [...page.items] : []).sort(byPos).flatMap((item) => {
         if (typeof item?.entity_id === 'string' && item.entity_id) return [{ entityId: item.entity_id }];
         const group = typeof item?.group_id === 'string' ? groups.get(item.group_id) : null;
