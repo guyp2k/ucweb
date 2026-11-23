@@ -368,7 +368,7 @@ activities, then starts, presses, renames and deletes through ucweb and checks t
 push before the image is built.
 
 ```sh
-docker run -d --name core-simulator -p 8080:8080 unfoldedcircle/core-simulator:0.81.2-bt
+docker run -d --name core-simulator -p 8080:8080 unfoldedcircle/core-simulator:0.85.4-bt
 UC_SIM=127.0.0.1:8080 npm run test:sim
 ```
 

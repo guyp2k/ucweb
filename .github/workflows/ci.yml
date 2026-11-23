@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       core-simulator:
-        image: unfoldedcircle/core-simulator:0.81.2-bt
+        image: unfoldedcircle/core-simulator:0.85.4-bt
         ports:
           - 8080:8080
     steps:
