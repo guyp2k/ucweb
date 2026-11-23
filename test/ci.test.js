@@ -33,3 +33,13 @@ test('every action in CI runs on the Node 24 runtime, not the deprecated Node 20
     assert.ok(Number(major) >= minimum[action], `${action}@v${major} still runs on Node 20`);
   }
 });
+
+test('CI and the README run the same core-simulator release', async () => {
+  const yaml = await readFile(workflow, 'utf8');
+  const readme = await readFile(path.join(path.dirname(workflow), '..', '..', 'README.md'), 'utf8');
+  const ci = yaml.match(/image: unfoldedcircle\/core-simulator:(\S+)$/m);
+  const docs = readme.match(/unfoldedcircle\/core-simulator:(\S+)$/m);
+  assert.ok(ci, 'ci.yml has no core-simulator image');
+  assert.ok(docs, 'README has no core-simulator run command');
+  assert.equal(docs[1], ci[1]);
+});
