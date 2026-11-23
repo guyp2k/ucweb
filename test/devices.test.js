@@ -519,3 +519,16 @@ test('a page named only with spaces takes its name from its title image, and a r
     ['Page', []],
   ]);
 });
+
+test('a page named from its title image keeps the capitals the file name uses', () => {
+  const pages = toProfilePages([
+    { page_id: 'a', pos: 1, name: ' ', image: 'custom:title13-LMS.png', items: [] },
+    { page_id: 'b', pos: 2, name: ' ', image: 'custom:title13-smart-home.png', items: [] },
+    { page_id: 'c', pos: 3, name: ' ', image: 'custom:TITLE13-roon.png', items: [] },
+  ]);
+  assert.deepEqual(pages.map((page) => [page.name, page.imageWords]), [
+    ['LMS', ['lms']],
+    ['Smart Home', ['smart', 'home']],
+    ['Roon', ['roon']],
+  ]);
+});
